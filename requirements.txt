@@ -1,0 +1,7 @@
+scrapy
+pymysql
+redis
+pymongo
+pillow
+lxml
+bloom-filter==1.3
