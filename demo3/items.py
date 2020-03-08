@@ -28,7 +28,7 @@ class Book(scrapy.Item):
     last_chapter = scrapy.Field('')
     last_chapter_id = scrapy.Field('')
     first_chapter_id = scrapy.Field('')
-    
+    goes=scrapy.Field('')
     cover = scrapy.Field('')
     link = scrapy.Field('')
 class Chapter(scrapy.Item):
@@ -36,6 +36,8 @@ class Chapter(scrapy.Item):
     _id=scrapy.Field()
     chapter_name=scrapy.Field()
     content=scrapy.Field()
+    has_content=scrapy.Field()
+
 
 class MeiZi(scrapy.Item):
     imgUrl = scrapy.Field()

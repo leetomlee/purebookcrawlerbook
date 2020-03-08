@@ -9,6 +9,11 @@ import random
 import pymongo
 from scrapy.downloadermiddlewares.useragent import UserAgentMiddleware
 
+# class Demo3Pipeline(object):
+#     def process_item(self, item, spider):
+#         return item
+from demo3.items import Book
+
 # class MeiZiPipeline(ImagesPipeline):
 #     pass
 # class PiaoHuaPipeline(object):
@@ -19,8 +24,6 @@ from scrapy.downloadermiddlewares.useragent import UserAgentMiddleware
 #     posts.insert(item)
 #
 #     pass
-from demo3.items import Book
-
 # dbparams = dict(
 #     host='120.27.244.128',  # 读取settings中的配置
 #     db='book',
@@ -31,25 +34,24 @@ from demo3.items import Book
 #     use_unicode=False,
 # )
 
-
-# class Demo3Pipeline(object):
-#     def process_item(self, item, spider):
-#         return item
 uri = 'mongodb://admin:lx123456zx@120.27.244.128:27017/admin'
 
-client = pymongo.MongoClient(host='120.27.244.128')
+client = pymongo.MongoClient(host='192.168.3.9')
+# client = pymongo.MongoClient(host='120.27.244.128')
 db = client['book']
 book = db['book']
 chapter = db['chapter']
 
 
 class CrawlerScrapyPipeline(object):
-
     def process_item(self, item, spider):
-        if isinstance(item, Book):
-            book.update_one({"_id":item["_id"]}, {"$set": dict(item)}, upsert=True)
-        else:
-            chapter.insert(dict(item))
+        try:
+            if isinstance(item, Book):
+                book.update_one({"_id": item["_id"]}, {"$set": dict(item)}, upsert=True)
+            else:
+                chapter.insert_one(dict(item))
+        except Exception as e:
+            pass
         return item
         # 写入数据库中
 
@@ -114,7 +116,6 @@ class RotateUserAgentMiddleware(UserAgentMiddleware):
     def process_request(self, request, spider):
         ua = random.choice(self.user_agent_list)
         if ua:
-            print(ua)
             request.headers.setdefault('User-Agent', ua)
 
     user_agent_list = [
