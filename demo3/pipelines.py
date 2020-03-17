@@ -4,6 +4,7 @@
 #
 # Don't forget to add your pipeline to the ITEM_PIPELINES setting
 # See: http://doc.scrapy.org/en/latest/topics/item-pipeline.html
+import logging
 import random
 
 import pymongo
@@ -12,7 +13,6 @@ from scrapy.downloadermiddlewares.useragent import UserAgentMiddleware
 # class Demo3Pipeline(object):
 #     def process_item(self, item, spider):
 #         return item
-from demo3.items import Book
 
 # class MeiZiPipeline(ImagesPipeline):
 #     pass
@@ -46,13 +46,18 @@ chapter = db['chapter']
 class CrawlerScrapyPipeline(object):
     def process_item(self, item, spider):
         try:
-            if isinstance(item, Book):
-                book.update_one({"_id": item["_id"]}, {"$set": dict(item)}, upsert=True)
-            else:
-                chapter.insert_one(dict(item))
+            book.insert_one(dict(item))
         except Exception as e:
-            pass
+            logging.error(e)
         return item
+        # try:
+        #     if isinstance(item, Book):
+        #         book.update_one({"_id": item["_id"]}, {"$set": dict(item)}, upsert=True)
+        #     else:
+        #         chapter.insert_one(dict(item))
+        # except Exception as e:
+        #     pass
+        # return item
         # 写入数据库中
 
     # def getids(self):

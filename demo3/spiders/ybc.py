@@ -47,22 +47,22 @@ class MeiziSpider(CrawlSpider):
         book.add_value('last_chapter_id', str(fk).split('/')[-1].split('.')[0])
         item = book.load_item()
         yield item
-        has = 10
-
-        for dd in selector.xpath("//*[@id='list']/dl/dd"):
-            if len(dd.xpath('a/@href')) > 0:
-                s = dd.xpath('a/@href').extract_first()
-                url = site + s
-                name = dd.xpath('a/text()').extract_first()
-                split = str(s).split('/')
-                bid = split[2]
-                cid = split[3].split('.')[0]
-                chapter = CommonItemLoader(item=Chapter(), response=response)
-                chapter.add_value('book_id', bid)
-                chapter.add_value('_id', cid)
-                chapter.add_value('content', url)
-                chapter.add_value('chapter_name', name)
-                chapter.add_value('has_content', has)
-
-                has += 1
-                yield chapter.load_item()
+        # has = 10
+        #
+        # for dd in selector.xpath("//*[@id='list']/dl/dd"):
+        #     if len(dd.xpath('a/@href')) > 0:
+        #         s = dd.xpath('a/@href').extract_first()
+        #         url = site + s
+        #         name = dd.xpath('a/text()').extract_first()
+        #         split = str(s).split('/')
+        #         bid = split[2]
+        #         cid = split[3].split('.')[0]
+        #         chapter = CommonItemLoader(item=Chapter(), response=response)
+        #         chapter.add_value('book_id', bid)
+        #         chapter.add_value('_id', cid)
+        #         chapter.add_value('content', url)
+        #         chapter.add_value('chapter_name', name)
+        #         chapter.add_value('has_content', has)
+        #
+        #         has += 1
+        #         yield chapter.load_item()

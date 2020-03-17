@@ -46,11 +46,11 @@ def getHTML(url):
 def getScores():
     find = book.find({}, {"_id": 1, "author": 1, "book_name": 1, "rate": 1})
     for f in find:
-        try:
-            f["rate"]
-            continue
-        except Exception as e:
-            pass
+#        try:
+#            f["rate"]
+#            continue
+#        except Exception as e:
+#            pass
         id = f["_id"]
         author = f["author"]
         name = f["book_name"]

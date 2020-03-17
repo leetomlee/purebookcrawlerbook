@@ -3,7 +3,7 @@ import datetime
 import random
 import smtplib
 import time
-from concurrent.futures._base import FIRST_COMPLETED, wait
+from concurrent.futures._base import wait, FIRST_COMPLETED
 from concurrent.futures.thread import ThreadPoolExecutor
 from email.header import Header
 from email.mime.text import MIMEText
@@ -52,10 +52,11 @@ def getHTML(url):
 
 
 def get_books_from_db():
-    sort = [('_id', -1)]
+    sort = [('hot', 1)]
     # find = book.find({}, {"_id": 1}).sort(sort)
-    find = book.find({"status": "连载中"}, {"_id": 1, })
+    find = book.find({"hot": {"$gt": 1}}, {"_id": 1, "hot": 1})
     for f in find:
+        # print(str(f['hot']) + "   " + str(f["_id"]))
         # updateBook(f["_id"], "https://www.biquge.com.cn/book/%s/" % f["_id"])
         with ThreadPoolExecutor() as t:
             all_task = [t.submit(updateBook, f["_id"], "https://www.biquge.com.cn/book/%s/" % f["_id"]) for f
@@ -68,6 +69,26 @@ def get_chapter_content(url):
     html = getHTML(url)
     content = "\r\n".join(html.xpath("//*[@id='content']/text()"))
     return content
+
+
+def update_book_info(id):
+    book_url = "https://www.biquge.com.cn/book/%s/" % str(id)
+    html = getHTML(book_url)
+
+    status = html.xpath(
+        "//*[@id='info']/p[2]/text()")[0].split('：')[1][:-1]
+
+    x = html.xpath("//*[@id='info']/p[3]/text()")[0]
+    u_time = str(x)[-19:]
+    last_chapter = html.xpath("//*[@id='info']/p[4]/a/text()")[0]
+    fk = html.xpath("//*[@id='info']/p[4]/a/@href")[0]
+    last_chapter_id = str(fk).split('/')[-1].split('.')[0]
+    myquery = {"_id": id}
+    newvalues = {
+        "$set": {"status": status, "u_time": u_time, "last_chapter": last_chapter, "last_chapter_id": last_chapter_id}}
+
+    book.update_one(myquery, newvalues)
+    logging.info("book info update" + str(id))
 
 
 def updateBook(id, url):
@@ -98,6 +119,7 @@ def updateBook(id, url):
     try:
         if len(chapters) != 0:
             many = chapterDB.insert_many(chapters)
+            update_book_info(id)
             logging.info("new add  " + str(len(many.inserted_ids)))
     except Exception as e:
         logging.error(e)
