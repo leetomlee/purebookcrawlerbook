@@ -4,10 +4,11 @@
 #
 # See documentation in:
 # http://doc.scrapy.org/en/latest/topics/spider-middleware.html
-from fake_useragent import UserAgent
+import os
+import random
+
+import pymongo
 from scrapy import signals
-
-
 # class ProxyMiddleware(object):
 #     def process_request(self, request, spider):
 #         # Set the location of the proxy
@@ -18,6 +19,8 @@ from scrapy import signals
 #         # # setup basic authentication for the proxy
 #         # encoded_user_pass = base64.b64encode(proxy_user_pass)
 #         # request.headers['Proxy-Authorization'] = 'Basic ' + encoded_user_pass
+from scrapy.downloadermiddlewares.useragent import UserAgentMiddleware
+from scrapy.dupefilters import RFPDupeFilter
 
 
 class Demo3SpiderMiddleware(object):
@@ -62,21 +65,58 @@ class Demo3SpiderMiddleware(object):
 
         # Must return only requests (not items).
         for r in start_requests:
+            spider.logger.info('Spider yield request: %s' % r)
             yield r
 
     def spider_opened(self, spider):
         spider.logger.info('Spider opened: %s' % spider.name)
 
 
-class RandomUserAgentMiddleware(object):
-    def __init__(self, crawler):
-        super(RandomUserAgentMiddleware, self).__init__()
-        self.ua = UserAgent()
 
-    @classmethod
-    def from_crawler(cls, crawler):
-        return cls(crawler)
+
+
+# class CustomFilter(RFPDupeFilter):
+#     """A dupe filter that considers specific ids in the url"""
+#
+#     def __getid(self, url):
+#         mm = url.split("/")[-2]  # or something like that
+#         return mm
+#
+#     def request_seen(self, request):
+#         fp = self.__getid(request.url)
+#         if fp in ids:
+#             return True
+#         ids.append(fp)
+#         if self.file:
+#             self.file.write(fp + os.linesep)
+
+
+class RotateUserAgentMiddleware(UserAgentMiddleware):
+    def __init__(self, user_agent=''):
+        self.user_agent = user_agent
 
     def process_request(self, request, spider):
-        rad = self.ua.random
-        request.headers.setdefault('User-Agent', self.ua.random)
+        ua = random.choice(self.user_agent_list)
+        if ua:
+            request.headers.setdefault('User-Agent', ua)
+
+    user_agent_list = [
+        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/22.0.1207.1 Safari/537.1" \
+        "Mozilla/5.0 (X11; CrOS i686 2268.111.0) AppleWebKit/536.11 (KHTML, like Gecko) Chrome/20.0.1132.57 Safari/536.11", \
+        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.6 (KHTML, like Gecko) Chrome/20.0.1092.0 Safari/536.6", \
+        "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.6 (KHTML, like Gecko) Chrome/20.0.1090.0 Safari/536.6", \
+        "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/19.77.34.5 Safari/537.1", \
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.9 Safari/536.5", \
+        "Mozilla/5.0 (Windows NT 6.0) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.36 Safari/536.5", \
+        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3", \
+        "Mozilla/5.0 (Windows NT 5.1) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3", \
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_0) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3", \
+        "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1062.0 Safari/536.3", \
+        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1062.0 Safari/536.3", \
+        "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3", \
+        "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3", \
+        "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3", \
+        "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.0 Safari/536.3", \
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24", \
+        "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24"
+    ]

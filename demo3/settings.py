@@ -8,15 +8,16 @@ NEWSPIDER_MODULE = 'demo3.spiders'
 # DEPTH_LIMIT = 5
 ROBOTSTXT_OBEY = False
 
-# DOWNLOAD_DELAY = 1.5
-
+# DOWNLOAD_DELAY = 0.5
 COOKIES_ENABLED = False
 
 DOWNLOADER_MIDDLEWARES = {
     'scrapy.contrib.downloadermiddleware.useragent.UserAgentMiddleware': None,
-    'demo3.pipelines.RotateUserAgentMiddleware': 400
+    'demo3.middlewares.RotateUserAgentMiddleware': 400,
+
 
 }
+#DUPEFILTER_CLASS = 'demo3.middlewares.CustomFilter'
 
 
 ITEM_PIPELINES = {
@@ -25,7 +26,7 @@ ITEM_PIPELINES = {
     'demo3.pipelines.CrawlerScrapyPipeline': 1,
     # 'scrapy_redis.pipelines.RedisPipeline': 300
 }
-LOG_LEVEL ='ERROR'
+LOG_LEVEL ='DEBUG'
 REDIS_HOST = "120.27.244.128"
 REDIS_PORT = "6379"
 REDIS_PARAMS = {

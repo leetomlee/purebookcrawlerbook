@@ -1,22 +1,22 @@
 # -*- coding: utf-8 -*-
 import datetime
 import random
-import smtplib
 import time
-from concurrent.futures._base import wait, FIRST_COMPLETED
-from concurrent.futures.thread import ThreadPoolExecutor
-from email.header import Header
-from email.mime.text import MIMEText
+from concurrent.futures.process import ProcessPoolExecutor
 
 import pymongo
 # client = pymongo.MongoClient(host='192.168.3.9')
 import requests
 from lxml import etree
+from redis import StrictRedis
 
-client = pymongo.MongoClient(host='120.27.244.128')
-db = client['book']
-book = db['book']
-chapterDB = db['chapter']
+ex = ProcessPoolExecutor()
+redis = StrictRedis(host='120.27.244.128', port=6379, db=0, password='zx222lx')
+myclient = pymongo.MongoClient('mongodb://lx:Lx123456@120.27.244.128:27017/')
+mydb = myclient["book"]
+book = mydb["xbiquge"]
+accountDB = mydb["account"]
+chapterDB = mydb["xchapter"]
 user_agent_list = [
     "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/22.0.1207.1 Safari/537.1" \
     "Mozilla/5.0 (X11; CrOS i686 2268.111.0) AppleWebKit/536.11 (KHTML, like Gecko) Chrome/20.0.1132.57 Safari/536.11", \
@@ -37,7 +37,7 @@ user_agent_list = [
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24", \
     "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24"
 ]
-site = 'https://www.biquge.com.cn'
+site = 'http://www.xbiquge.la'
 
 import logging  # 引入logging模块
 
@@ -51,44 +51,60 @@ def getHTML(url):
     return html
 
 
+def update_book_state():
+    find = book.find({}, {"_id": 1, "u_time": 1})
+    nowTime_str = datetime.datetime.now().strftime('%Y-%m-%d')
+    e_time = time.mktime(time.strptime(nowTime_str, "%Y-%m-%d"))
+
+    for f in find:
+        u_time = f["u_time"]
+        id = f["_id"]
+        if str(u_time).__contains__("最后更新"):
+            u_time = u_time[5:]
+        u_time = u_time[:10]
+        try:
+            s_time = time.mktime(time.strptime(u_time, '%Y-%m-%d'))
+
+            # 日期转化为int比较
+            diff = int(e_time) - int(s_time)
+
+            if diff >= 60 * 60 * 24 * 30 * 3:
+                logging.info("相差大于三个月 %s" % u_time)
+                myquery = {"_id": id}
+                newvalues = {
+                    "$set": {"status": "完结"}}
+
+                book.update_one(myquery, newvalues)
+            else:
+                continue
+
+        except Exception as e:
+            logging.error("update error %s" % u_time)
+
+
 def get_books_from_db():
     sort = [('hot', 1)]
     # find = book.find({}, {"_id": 1}).sort(sort)
-    find = book.find({"hot": {"$gt": 1}}, {"_id": 1, "hot": 1})
+    # find = book.find({"hot": 0}, {"_id": 1, "hot": 1, "link": 1})
+    # find = book.find({}, {"_id": 1, "link": 1})
+    find = book.find({"hot": {"$gt": 0}, "status": {"$ne": "完结"}}, {"_id": 1, "link": 1})
+    # find = book.find({"hot": {"$gt": 0}}, {"_id": 1, "link": 1})
     for f in find:
-        # print(str(f['hot']) + "   " + str(f["_id"]))
-        # updateBook(f["_id"], "https://www.biquge.com.cn/book/%s/" % f["_id"])
-        with ThreadPoolExecutor() as t:
-            all_task = [t.submit(updateBook, f["_id"], "https://www.biquge.com.cn/book/%s/" % f["_id"]) for f
-                        in
-                        find]
-            wait(all_task, return_when=FIRST_COMPLETED)
+        #     print(f["status"])
+        # chapterDB.delete_many({"book_id": f["_id"]})
+
+        # updateBook(f["_id"], f["link"])
+        ex.submit(updateBook, f["_id"], f["link"])
+    ex.shutdown(wait=True)
 
 
 def get_chapter_content(url):
     html = getHTML(url)
-    content = "\r\n".join(html.xpath("//*[@id='content']/text()"))
+    content = ""
+    for f in html.xpath("//*[@id='content']/text()"):
+        if f != "" and f != "," and f != "\r":
+            content += f
     return content
-
-
-def update_book_info(id):
-    book_url = "https://www.biquge.com.cn/book/%s/" % str(id)
-    html = getHTML(book_url)
-
-    status = html.xpath(
-        "//*[@id='info']/p[2]/text()")[0].split('：')[1][:-1]
-
-    x = html.xpath("//*[@id='info']/p[3]/text()")[0]
-    u_time = str(x)[-19:]
-    last_chapter = html.xpath("//*[@id='info']/p[4]/a/text()")[0]
-    fk = html.xpath("//*[@id='info']/p[4]/a/@href")[0]
-    last_chapter_id = str(fk).split('/')[-1].split('.')[0]
-    myquery = {"_id": id}
-    newvalues = {
-        "$set": {"status": status, "u_time": u_time, "last_chapter": last_chapter, "last_chapter_id": last_chapter_id}}
-
-    book.update_one(myquery, newvalues)
-    logging.info("book info update" + str(id))
 
 
 def updateBook(id, url):
@@ -99,61 +115,105 @@ def updateBook(id, url):
     for chp in chps:
         ids.append(chp["chapter_id"])
     chapters = []
+    newcids = []
     for dd in html.xpath("//*[@id='list']/dl/dd"):
         if len(dd.xpath('a/@href')) > 0:
-            s = dd.xpath('a/@href')[0]
-            url = site + s
-            name = dd.xpath('a/text()')[0]
-            split = str(s).split('/')
-            bid = split[2]
-            cid = bid + split[3].split('.')[0]
-            if ids.__contains__(cid):
+            try:
+                s = dd.xpath('a/@href')[0]
+                name = dd.xpath('a/text()')[0]
+                split = str(s).split('/')
+
+                cid = id + split[-1].split('.')[0]
+                if ids.__contains__(cid):
+                    continue
+                newcids.append(cid)
+                chapter = {
+                    'book_id': id,
+                    'chapter_id': cid,
+                    'content': site + s,
+                    'chapter_name': name}
+                chapters.append(chapter)
+            except Exception as e:
+                logging.error(e)
                 continue
-            chapter = {
-                'book_id': bid,
-                'chapter_id': cid,
-                'content': get_chapter_content(url),
-                'chapter_name': name}
-            chapters.append(chapter)
     # logging.info("new add  " + str(len(chapters)))
     try:
         if len(chapters) != 0:
             many = chapterDB.insert_many(chapters)
-            update_book_info(id)
+            for x in many.inserted_ids:
+                try:
+                    requests.get("https://newbook.leetomlee.xyz/v1/book/chapter/" + str(x))
+                except Exception as e:
+                    logging.error(e)
             logging.info("new add  " + str(len(many.inserted_ids)))
+
+            update_time = html.xpath('//*[@id="info"]/p[3]/text()')[0]
+            latest_chapter_name = html.xpath('//*[@id="info"]/p[4]/a/text()')[0]
+
+            myquery = {"_id": id}
+            newvalues = {
+                "$set": {"u_time": update_time, "last_chapter": latest_chapter_name}}
+
+            book.update_one(myquery, newvalues)
+            logging.info("book info update " + str(id))
     except Exception as e:
         logging.error(e)
-    ids = []
+    # 邮件发送库
 
 
-def send_mail(msg):
-    sender = '18736262687@163.com'
+import smtplib
+# 邮件的标题
+# 邮件的正文
+from email.mime.text import MIMEText
 
-    receivers = ['lx_stu@qq.com']  # 接收邮件，可设置为你的QQ邮箱或者其他邮箱
 
-    message = MIMEText(msg, 'plain', 'utf-8')
-    message['From'] = Header("18736262687@163.com", 'utf-8')  # 发送者
-    message['To'] = Header("lx_stu@qq.com", 'utf-8')  # 接收者
+def send_mail(user, pwd, sender, receiver, content, title):
+    # 邮箱服务器主机名
+    mail_host = "smtp.163.com"
+    # 创建邮件对象
+    message = MIMEText(content, "plain", "utf-8")
 
-    subject = '通知'
-    message['Subject'] = Header(subject, 'utf-8')
+    message["From"] = sender
+    message["To"] = receiver
+    message["Subject"] = title
 
-    try:
-        smtpObj = smtplib.SMTP()
-        smtpObj.connect('smtp.163.com', 25)  # 25 为 SMTP 端口号
-        smtpObj.login(sender, 'lx11427')
-        smtpObj.sendmail(sender, receivers, message.as_string())
-        logging.info("邮件发送成功")
-    except smtplib.SMTPException as e:
-        logging.error(e)
-        logging.info("Error: 无法发送邮件")
+    # 启动ssl发送邮件
+    smtp_obj = smtplib.SMTP_SSL(mail_host, 465)
 
+    smtp_obj.login(user, pwd)  # 登录
+
+    smtp_obj.sendmail(sender, receiver, message.as_string())
+
+    print("发送成功！")
+
+
+# if __name__ == '__main__':
+#     # update_book_state()
+#     get_books_from_db()
+# if __name__ == "__main__":
+#     user = "18736262687@163.com"  # 用户名
+#     pwd = "lx11427"  # 客户端授权码
+#     sender = user
+#
+#     fs = accountDB.find({"email": {"$regex": ".*@.*"}}, {"email": 1})
+#     for f in fs:
+#         recevier = f["email"]
+#         content = "欢迎使用DeerBook,加交流联系群,防走失,App更新,信息公告"
+#         title = "Account Ack,Do Not Reply"
+#
+#         send_mail(user, pwd, sender, recevier, content, title)
 
 if __name__ == '__main__':
-    # send_mail('也许今天就可以来面试')
+    # get_books_from_db()
     stime = datetime.datetime.now()
     logging.info("all update  " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
     get_books_from_db()
     logging.info("end update  " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
     etime = datetime.datetime.now()
-    logging.info("waste_time  " + str((etime - stime).seconds))
+    logging.info("used_time  " + str((etime - stime).seconds))
+# find = chapterDB.find({"content": {"$regex": "看最快更新无错小说.*"}}, {"content": 1, "_id": 1})
+# for f in find:
+#     chapterDB.delete_one({"_id": f["_id"]})
+#     # print(f["content"])
+# #     if str(f['content']).startswith('http'):
+# get_chapter_content("http://www.xbiquge.la/26/26874/23129742.html")
