@@ -93,5 +93,35 @@ def getScores():
             continue
 
 
+def gert_score(name, id, author):
+    url = "https://www.qidian.com/search?kw=%s" % name
+
+    html = getHTML(url)
+    lis = html.xpath("//*[@id='result-list']/div/ul/li")
+    for li in lis:
+        bookInfoUrl = "https:" + li.xpath("div/a/@href")[0]
+        bookImgUrl = "https:" + li.xpath('div/a/img/@src')[0]
+        bookNames = li.xpath("div[2]/h4/a/text()")
+        if len(bookNames) == 0:
+            bookNames = li.xpath("div[2]/h4/a/cite/text()")
+            if len(bookNames) == 0:
+                continue
+        bookName = bookNames[0]
+        bookAuthor = li.xpath("div[2]/p[1]/a[1]/text()")[0]
+        bookStatus = li.xpath("div[2]/p/span/text()")[0]
+        if str(name).__contains__(bookName) and author == bookAuthor:
+            u = 'https://book.qidian.com/ajax/comment/index?_csrfToken=VyDQJGV3vLqNzMY8pduwEYAAfT1tla9d0A67VoII&bookId=' + str(
+                bookInfoUrl.split('/')[-1]) + '&pageSize=15'
+            res = requests.get(u).text
+            rate = json.loads(res)['data']['rate']
+            if not str(rate).__contains__('.'):
+                rate = float(str(rate) + '.0')
+
+            myquery = {"_id": id}
+            newvalues = {"$set": {"cover": bookImgUrl, "status": bookStatus, "rate": rate}}
+            logging.info(name + author + str(rate))
+            book.update_one(myquery, newvalues)
+
+
 if __name__ == '__main__':
     getScores()

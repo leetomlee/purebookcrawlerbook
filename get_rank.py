@@ -8,7 +8,7 @@ from lxml import etree
 
 myclient = pymongo.MongoClient('mongodb://lx:Lx123456@120.27.244.128:27017/')
 mydb = myclient["book"]
-book = mydb["xbiquge"]
+book = mydb["bks"]
 rank = mydb["rank"]
 
 user_agent_list = [
@@ -66,14 +66,18 @@ def get_feMale_rank():
                 try:
                     if u.__contains__("readIndex"):
                         book_name = li.xpath("td[2]/a/text()")[0]
+                        link = li.xpath("td[2]/a/@href")[0]
                         author = li.xpath("td[5]/a/text()")[0]
                     else:
                         book_name = li.xpath("td[3]/a/text()")[0]
+                        link = li.xpath("td[3]/a/@href")[0]
                         author = li.xpath("td[6]/a/text()")[0]
-                    find = book.find_one({"book_name": book_name, "author": author}, {"_id": 1, "cover": 1})
-                    ids.append({"id": find["_id"], "cover": find["cover"], "name": book_name})
+                    html = getHTML("https:" + link)
+                    cover = "https:" + str(html.xpath('//*[@id="bookImg"]/img/@src')[0]).strip()
+                    # find = book.find_one({"book_name": book_name, "author": author}, {"_id": 1, "cover": 1})
+                    ids.append({"cover": cover, "name": book_name, "author": author})
                 except Exception as e:
-                    logging.error("link " + u + " 数据库中不存在 " + author + " 写的 " + book_name)
+                    logging.error(e)
         feMaleRank[text] = ids
     feMaleRank["type"] = 2
     rank.insert_one(feMaleRank)
@@ -94,14 +98,18 @@ def get_male_rank():
             try:
                 if u.__contains__("readIndex"):
                     book_name = li.xpath("td[2]/a/text()")[0]
+                    link = li.xpath("td[2]/a/@href")[0]
                     author = li.xpath("td[5]/a/text()")[0]
                 else:
                     book_name = li.xpath("td[3]/a/text()")[0]
+                    link = li.xpath("td[3]/a/@href")[0]
                     author = li.xpath("td[6]/a/text()")[0]
-                find = book.find_one({"book_name": book_name, "author": author}, {"_id": 1, "cover": 1})
-                ids.append({"id": find["_id"], "cover": find["cover"], "name": book_name})
+                html = getHTML("https:" + link)
+                cover = "https:" + str(html.xpath('//*[@id="bookImg"]/img/@src')[0]).strip()
+                # find = book.find_one({"book_name": book_name, "author": author}, {"_id": 1, "cover": 1})
+                ids.append({"cover": cover, "name": book_name, "author": author})
             except Exception as e:
-                logging.error(u + "  数据库中不存在 " + author + " 写的 " + book_name)
+                logging.error(e)
         maleRank[text] = ids
     maleRank["type"] = 1
     rank.insert_one(maleRank)

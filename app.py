@@ -1,17 +1,46 @@
 #!flask/bin/python
+# -*- coding: utf-8 -*-
 import json
 import os
+import random
 import re
+import threading
 import urllib
 from concurrent.futures import ALL_COMPLETED, wait
 from concurrent.futures.thread import ThreadPoolExecutor
 
+import pymongo
 import records
 import redis
 import requests
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_apscheduler import APScheduler
 from lxml import etree
+
+myclient = pymongo.MongoClient('mongodb://lx:Lx123456@120.27.244.128:27017/')
+mydb = myclient["book"]
+bookDB = mydb["bks"]
+chapterDB = mydb["cps"]
+user_agent_list = [
+    "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/22.0.1207.1 Safari/537.1" \
+    "Mozilla/5.0 (X11; CrOS i686 2268.111.0) AppleWebKit/536.11 (KHTML, like Gecko) Chrome/20.0.1132.57 Safari/536.11", \
+    "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.6 (KHTML, like Gecko) Chrome/20.0.1092.0 Safari/536.6", \
+    "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.6 (KHTML, like Gecko) Chrome/20.0.1090.0 Safari/536.6", \
+    "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/19.77.34.5 Safari/537.1", \
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.9 Safari/536.5", \
+    "Mozilla/5.0 (Windows NT 6.0) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.36 Safari/536.5", \
+    "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3", \
+    "Mozilla/5.0 (Windows NT 5.1) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3", \
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_0) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3", \
+    "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1062.0 Safari/536.3", \
+    "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1062.0 Safari/536.3", \
+    "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3", \
+    "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3", \
+    "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3", \
+    "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.0 Safari/536.3", \
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24", \
+    "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24"
+]
 
 
 class Config(object):  # 创建配置，用类
@@ -42,6 +71,19 @@ db = records.Database('mysql+pymysql://root:fKH31da8eqJHIU134ms1@120.27.244.128:
 headers = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.84 Safari/537.36',
 }
+
+
+def is_chinese(string):
+    """
+    检查整个字符串是否包含中文
+    :param string: 需要检查的字符串
+    :return: bool
+    """
+    for ch in string:
+        if u'\u4e00' <= ch <= u'\u9fff':
+            return True
+
+    return False
 
 
 def getList(html):
@@ -321,7 +363,7 @@ def movieUrl(type, id):
     domain = ''
     rule = ''
     if (type == 'tv'):
-        url = 'https://91mjw.com/vplay/' + id+'.html'
+        url = 'https://91mjw.com/vplay/' + id + '.html'
         domain = 'https://91mjw.com/vplay/'
 
         rule = 1
@@ -517,6 +559,49 @@ def idx_movie():
             return
 
 
+@app.route('/book/search/<string:word>/<string:page>', methods=['GET'])
+def book_search(word, page):
+    domain = 'https://www.biquge.com'
+    url = "https://www.biquge.com/searchbook.php?keyword=%s&page=%s" % (word, page)
+    html = getHTML(url)
+    divs = html.xpath('//*[@id="hotcontent"]/div/div')
+    books = []
+    for div in divs:
+        books.append({
+            "Id": str(div.xpath('div/a/@href')[0]).split('/')[1],
+            "Img": domain + div.xpath('div/a/img/@src')[0],
+            "Author": str(div.xpath('dl/dt/span/text()')[0]).strip(),
+            "Name": str(div.xpath('dl/dt/a/text()')[0]).strip(),
+            "Desc": str(div.xpath('dl/dd/text()')[0]).strip()
+        })
+    result = {
+        "code": 200,
+        "msg": "操作成功",
+        "data": books
+    }
+    return json.dumps(result, ensure_ascii=False)
+
+
+@app.route('/book/detail/<string:word>', methods=['GET'])
+def get_detail(word):
+    parse_book_detail(word)
+    return ""
+
+
+
+@app.route('/book/chapter', methods=['GET'])
+def get_chapter():
+    url = request.args.get("url")
+    html = getHTMLUtf8(url)
+    content = ""
+    for text in html.xpath('//*[@id="content"]/text()'):
+        if not str(text).strip() == "":
+            if not str(text).startswith("\n"):
+                if is_chinese(str(text)):
+                    content += "\t\t\t\t\t\t\t\t" + str(text).strip() + "\n"
+    return content
+
+
 def freshIdx():
     cates = [
         'kehuanpian',
@@ -555,6 +640,91 @@ def freshIdx():
         html = etree.HTML(res.content)
         res = getList(html)
         redis.set(url, json.dumps(res), ex=60 * 60 * 24)
+
+
+def parse_book_detail(id):
+    url = "https://www.biquge.com/" + id + "/"
+    selector = getHTML(url)
+    book_name = selector.xpath("//meta[@property='og:novel:book_name']/@content")[0]
+    author = selector.xpath("//meta[@property='og:novel:author']/@content")[0]
+    cover = selector.xpath("//meta[@property='og:image']/@content")[0]
+    category = selector.xpath("//meta[@property='og:novel:category']/@content")[0]
+    update_time = selector.xpath("//meta[@property='og:novel:update_time']/@content")[0]
+    status = selector.xpath("//meta[@property='og:novel:status']/@content")[0]
+
+    # latest_chapter_url = selector.xpath('//*[@id="info"]/p[4]/a/@href')[0]
+    book_desc = selector.xpath("//meta[@property='og:description']/@content")[0]
+    latest_chapter_name = selector.xpath(
+        "//meta[@property='og:novel:latest_chapter_name']/@content")[0]
+
+    book = {"link": url,
+            "_id": id,
+            "cover": cover,
+            "hot": 0,
+            'book_name': str(book_name).strip(),
+            'author': str(author).strip(),
+            'category': category,
+            'status': status,
+            'book_desc': book_desc,
+            "u_time": update_time,
+            'last_chapter': latest_chapter_name}
+    bookDB.insert_one(dict(book))
+    t1 = threading.Thread(target=gert_score, args=(book_name, id, author))
+
+    t1.start()
+    chapters = []
+    for dd in selector.xpath('//*[@id="list"]/dl/dt[2]/following-sibling::*'):
+        if len(dd.xpath('a/@href')) > 0:
+            name = dd.xpath('a/text()')[0]
+            s = dd.xpath('a/@href')[0]
+            chapter = {
+                'book_id': id,
+                'link': 'https://www.biquge.com' + s,
+                'chapter_name': name}
+            chapters.append(chapter)
+    if len(chapters) > 0:
+        chapterDB.insert_many(chapters)
+    return requests.get("https://book.leetomlee.xyz/v1/book/detail/" + id).text
+
+def getHTMLUtf8(url):
+    get = requests.get(url, headers={"User-Agent": random.choice(user_agent_list)})
+    get.encoding = "utf-8"
+    html = etree.HTML(get.text)
+    return html
+def gert_score(name, id, author):
+    url = "https://www.qidian.com/search?kw=%s" % name
+
+    html = getHTMLUtf8(url)
+    lis = html.xpath("//*[@id='result-list']/div/ul/li")
+    for li in lis:
+        bookInfoUrl = "https:" + li.xpath("div/a/@href")[0]
+        bookImgUrl = "https:" + li.xpath('div/a/img/@src')[0]
+        bookNames = li.xpath("div[2]/h4/a/text()")
+        if len(bookNames) == 0:
+            bookNames = li.xpath("div[2]/h4/a/cite/text()")
+            if len(bookNames) == 0:
+                continue
+        bookName = bookNames[0]
+        bookAuthor = li.xpath("div[2]/p[1]/a[1]/text()")[0]
+        bookStatus = li.xpath("div[2]/p/span/text()")[0]
+        if str(name).__contains__(bookName) and author == bookAuthor:
+            u = 'https://book.qidian.com/ajax/comment/index?_csrfToken=VyDQJGV3vLqNzMY8pduwEYAAfT1tla9d0A67VoII&bookId=' + str(
+                bookInfoUrl.split('/')[-1]) + '&pageSize=15'
+            res = requests.get(u).text
+            rate = json.loads(res)['data']['rate']
+            if not str(rate).__contains__('.'):
+                rate = float(str(rate) + '.0')
+
+            myquery = {"_id": id}
+            newvalues = {"$set": {"cover": bookImgUrl, "status": bookStatus, "rate": rate}}
+            bookDB.update_one(myquery, newvalues)
+
+
+def getHTML(url):
+    get = requests.get(url, headers={"User-Agent": random.choice(user_agent_list)})
+    # get.encoding = "utf-8"
+    html = etree.HTML(get.text)
+    return html
 
 
 if __name__ == '__main__':

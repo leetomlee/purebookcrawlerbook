@@ -14,9 +14,9 @@ ex = ProcessPoolExecutor()
 redis = StrictRedis(host='120.27.244.128', port=6379, db=0, password='zx222lx')
 myclient = pymongo.MongoClient('mongodb://lx:Lx123456@120.27.244.128:27017/')
 mydb = myclient["book"]
-book = mydb["xbiquge"]
+book = mydb["bks"]
 accountDB = mydb["account"]
-chapterDB = mydb["xchapter"]
+chapterDB = mydb["cps"]
 user_agent_list = [
     "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/22.0.1207.1 Safari/537.1" \
     "Mozilla/5.0 (X11; CrOS i686 2268.111.0) AppleWebKit/536.11 (KHTML, like Gecko) Chrome/20.0.1132.57 Safari/536.11", \
@@ -37,7 +37,6 @@ user_agent_list = [
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24", \
     "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24"
 ]
-site = 'http://www.xbiquge.la'
 
 import logging  # 引入logging模块
 
@@ -93,7 +92,6 @@ def get_books_from_db():
         #     print(f["status"])
         # chapterDB.delete_many({"book_id": f["_id"]})
         try:
-
             updateBook(f["_id"], f["link"])
             time.sleep(1)
         except Exception as e:
@@ -116,48 +114,39 @@ def updateBook(id, url):
     logging.info("start update  " + url)
     html = getHTML(url)
     ids = []
-    chps = chapterDB.find({"book_id": id}, {"chapter_id": 1})
+    chps = chapterDB.find({"book_id": id}, {"chapter_name": 1})
     for chp in chps:
-        ids.append(chp["chapter_id"])
+        ids.append(chp["chapter_name"])
     chapters = []
-    newcids = []
-    for dd in html.xpath("//*[@id='list']/dl/dd"):
+    for dd in html.xpath("//*[@id='list']/dl/dt[2]/following-sibling::*"):
         if len(dd.xpath('a/@href')) > 0:
-            try:
-                s = dd.xpath('a/@href')[0]
-                name = dd.xpath('a/text()')[0]
-                split = str(s).split('/')
-
-                cid = id + split[-1].split('.')[0]
-                if ids.__contains__(cid):
-                    continue
-                newcids.append(cid)
-                chapter = {
-                    'book_id': id,
-                    'chapter_id': cid,
-                    'content': site + s,
-                    'chapter_name': name}
-                chapters.append(chapter)
-            except Exception as e:
-                logging.error(e)
+            name = dd.xpath('a/text()')[0]
+            s = dd.xpath('a/@href')[0]
+            if ids.__contains__(name):
                 continue
+            chapter = {
+                'book_id': id,
+                'link': 'https://www.biquge.com' + s,
+                'chapter_name': name}
+            chapters.append(chapter)
     # logging.info("new add  " + str(len(chapters)))
     try:
         if len(chapters) != 0:
             many = chapterDB.insert_many(chapters)
             for x in many.inserted_ids:
                 try:
-                    requests.get("https://newbook.leetomlee.xyz/v1/book/chapter/" + str(x))
+                    requests.get("https://book.leetomlee.xyz/v1/book/chapter/" + str(x))
                 except Exception as e:
                     logging.error(e)
             logging.info("new add  " + str(len(many.inserted_ids)))
 
-            update_time = html.xpath('//*[@id="info"]/p[3]/text()')[0]
-            latest_chapter_name = html.xpath('//*[@id="info"]/p[4]/a/text()')[0]
+            update_time = html.xpath("//meta[@property='og:novel:update_time']/@content")[0]
+            latest_chapter_name = html.xpath("//meta[@property='og:novel:latest_chapter_name']/@content")[0]
+            status = html.xpath("//meta[@property='og:novel:status']/@content")[0]
 
             myquery = {"_id": id}
             newvalues = {
-                "$set": {"u_time": update_time, "last_chapter": latest_chapter_name}}
+                "$set": {"u_time": update_time, "last_chapter": latest_chapter_name, "status": status}}
 
             book.update_one(myquery, newvalues)
             logging.info("book info update " + str(id))
@@ -166,16 +155,19 @@ def updateBook(id, url):
 
 
 if __name__ == '__main__':
-    # get_books_from_db()
-    stime = datetime.datetime.now()
-    logging.info("all update  " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
-    get_books_from_db()
-    logging.info("end update  " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
-    etime = datetime.datetime.now()
-    logging.info("used_time  " + str((etime - stime).seconds))
-# find = chapterDB.find({"content": {"$regex": "看最快更新无错小说.*"}}, {"content": 1, "_id": 1})
-# for f in find:
-#     chapterDB.delete_one({"_id": f["_id"]})
-#     # print(f["content"])
-# #     if str(f['content']).startswith('http'):
-# get_chapter_content("http://www.xbiquge.la/26/26874/23129742.html")
+    updateBook("")
+    # find = chapterDB.find({}, {"_id": 1})
+    #
+    # for i in find:
+    #     myquery = {"_id": i["_id"]}
+    # newvalues = {
+    #         "$set": {"type": "1"}}
+    #
+    # book.update_many({}, newvalues)
+
+# stime = datetime.datetime.now()
+# logging.info("all update  " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+# get_books_from_db()
+# logging.info("end update  " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+# etime = datetime.datetime.now()
+# logging.info("used_time  " + str((etime - stime).seconds))

@@ -4,10 +4,9 @@
 #
 # See documentation in:
 # http://doc.scrapy.org/en/latest/topics/spider-middleware.html
-import os
 import random
 
-import pymongo
+import requests
 from scrapy import signals
 # class ProxyMiddleware(object):
 #     def process_request(self, request, spider):
@@ -20,7 +19,6 @@ from scrapy import signals
 #         # encoded_user_pass = base64.b64encode(proxy_user_pass)
 #         # request.headers['Proxy-Authorization'] = 'Basic ' + encoded_user_pass
 from scrapy.downloadermiddlewares.useragent import UserAgentMiddleware
-from scrapy.dupefilters import RFPDupeFilter
 
 
 class Demo3SpiderMiddleware(object):
@@ -72,9 +70,6 @@ class Demo3SpiderMiddleware(object):
         spider.logger.info('Spider opened: %s' % spider.name)
 
 
-
-
-
 # class CustomFilter(RFPDupeFilter):
 #     """A dupe filter that considers specific ids in the url"""
 #
@@ -89,6 +84,22 @@ class Demo3SpiderMiddleware(object):
 #         ids.append(fp)
 #         if self.file:
 #             self.file.write(fp + os.linesep)
+class ProxyMiddleware(object):
+
+    def __init__(self, ip):
+        self.ip = ip
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        proxy_ = get_proxy()['proxy']
+        return cls(ip=proxy_)
+
+    def process_request(self, request, spider):
+        request.meta['proxy'] = self.ip
+
+
+def get_proxy():
+    return requests.get("http://120.27.244.128:5010/get/").json()
 
 
 class RotateUserAgentMiddleware(UserAgentMiddleware):
