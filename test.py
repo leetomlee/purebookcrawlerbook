@@ -5,6 +5,7 @@ import time
 
 import pymongo
 import requests
+from lxml import etree
 from scrapy import Selector
 
 from demo3.items import CommonItemLoader, Book
@@ -96,7 +97,7 @@ def parse_book_to_db(response):
         chapterDB.insert_many(chapters)
 
 
-def calc_book_state( u_time):
+def calc_book_state(u_time):
     nowTime_str = datetime.datetime.now().strftime('%Y-%m-%d')
     e_time = time.mktime(time.strptime(nowTime_str, "%Y-%m-%d"))
     if str(u_time).__contains__("最后更新"):
@@ -116,5 +117,54 @@ def calc_book_state( u_time):
     return "连载中"
 
 
+def getHTMLUtf8(url):
+    get = requests.get(url, headers={"User-Agent": random.choice(user_agent_list)})
+    get.encoding = "utf-8"
+    html = etree.HTML(get.text)
+    return html
+
+
+def is_chinese(string):
+    """
+    检查整个字符串是否包含中文
+    :param string: 需要检查的字符串
+    :return: bool
+    """
+    for ch in string:
+        if u'\u4e00' <= ch <= u'\u9fff':
+            return True
+
+    return False
+
+
+def get_content(url):
+    html = getHTMLUtf8(url)
+    content = ""
+    if url.__contains__("xbiquge"):
+        return get_c(html)
+    else:
+        while True:
+            content += get_c(html)
+            next_text = html.xpath('//*[@id="container"]/div/div/div[2]/div[3]/a[3]/text()')[0]
+            html = getHTMLUtf8(
+                "https://www.266ks.com/" + html.xpath('//*[@id="container"]/div/div/div[2]/div[3]/a[3]/@href')[0])
+            if next_text != "下一页":
+                break
+
+    return content
+
+
+def get_c(html):
+    content = ""
+    for text in html.xpath('//*[@id="content"]/text()'):
+        if not str(text).strip() == "":
+            if not str(text).startswith("\n"):
+                if is_chinese(str(text)):
+                    content += "\t\t\t\t\t\t\t\t" + str(text).strip() + "\n"
+    return content
+
+
 if __name__ == '__main__':
-    getHTML("http://www.xbiquge.la/15/15977/")
+    # content = get_content("https://www.266ks.com/8_8975/5558978.html")
+    content = get_content("http://www.xbiquge.la/15/15977/8321996.html")
+    print(content)

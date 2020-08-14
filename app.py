@@ -72,7 +72,14 @@ headers = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.84 Safari/537.36',
 }
 
-
+def get_c(html):
+    content = ""
+    for text in html.xpath('//*[@id="content"]/text()'):
+        if not str(text).strip() == "":
+            if not str(text).startswith("\n"):
+                if is_chinese(str(text)):
+                    content += "\t\t\t\t\t\t\t\t" + str(text).strip() + "\n"
+    return content
 def is_chinese(string):
     """
     检查整个字符串是否包含中文
@@ -594,11 +601,17 @@ def get_chapter():
     url = request.args.get("url")
     html = getHTMLUtf8(url)
     content = ""
-    for text in html.xpath('//*[@id="content"]/text()'):
-        if not str(text).strip() == "":
-            if not str(text).startswith("\n"):
-                if is_chinese(str(text)):
-                    content += "\t\t\t\t\t\t\t\t" + str(text).strip() + "\n"
+    if url.__contains__("xbiquge"):
+        return get_c(html)
+    else:
+        while True:
+            content += get_c(html)
+            next_text = html.xpath('//*[@id="container"]/div/div/div[2]/div[3]/a[3]/text()')[0]
+            html = getHTMLUtf8(
+                "https://www.266ks.com/" + html.xpath('//*[@id="container"]/div/div/div[2]/div[3]/a[3]/@href')[0])
+            if next_text != "下一页":
+                break
+
     return content
 
 

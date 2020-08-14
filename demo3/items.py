@@ -31,6 +31,7 @@ class Book(scrapy.Item):
     goes=scrapy.Field('')
     cover = scrapy.Field('')
     link = scrapy.Field('')
+    type = scrapy.Field('')
 class Chapter(scrapy.Item):
     book_id=scrapy.Field()
     _id=scrapy.Field()
