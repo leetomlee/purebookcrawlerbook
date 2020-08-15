@@ -72,6 +72,7 @@ headers = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.84 Safari/537.36',
 }
 
+
 def get_c(html):
     content = ""
     for text in html.xpath('//*[@id="content"]/text()'):
@@ -80,6 +81,8 @@ def get_c(html):
                 if is_chinese(str(text)):
                     content += "\t\t\t\t\t\t\t\t" + str(text).strip() + "\n"
     return content
+
+
 def is_chinese(string):
     """
     检查整个字符串是否包含中文
@@ -595,12 +598,13 @@ def get_detail(word):
     return ""
 
 
-
 @app.route('/book/chapter', methods=['GET'])
 def get_chapter():
     url = request.args.get("url")
     html = getHTMLUtf8(url)
     content = ""
+    if html == None:
+        return content
     if url.__contains__("xbiquge"):
         return get_c(html)
     else:
@@ -699,11 +703,15 @@ def parse_book_detail(id):
         chapterDB.insert_many(chapters)
     return requests.get("https://book.leetomlee.xyz/v1/book/detail/" + id).text
 
+
 def getHTMLUtf8(url):
     get = requests.get(url, headers={"User-Agent": random.choice(user_agent_list)})
-    get.encoding = "utf-8"
-    html = etree.HTML(get.text)
-    return html
+    if get.status_code == 200:
+        get.encoding = "utf-8"
+        html = etree.HTML(get.text)
+        return html
+
+
 def gert_score(name, id, author):
     url = "https://www.qidian.com/search?kw=%s" % name
 
