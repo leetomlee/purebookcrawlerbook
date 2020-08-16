@@ -68,11 +68,27 @@ def updateBook(id, url):
         ids.append(chp["chapter_name"])
     chapters = []
     if str(url).__contains__("266ks"):
-        for option in html.xpath('/html/body/div[3]/div[2]/div/div[3]/span[2]/select/option'):
-            chapters_url = "https://www.266ks.com" + option.xpath('@value')[0]
-            ks = get_chapters_266ks(chapters_url, ids)
-            if len(ks) > 0:
-                chapters.append(ks)
+        if len(ids) == 0:
+
+            for option in html.xpath('/html/body/div[3]/div[2]/div/div[3]/span[2]/select/option'):
+                chapters_url = "https://www.266ks.com" + option.xpath('@value')[0]
+                ks = get_chapters_266ks(chapters_url, ids)
+                if len(ks) > 0:
+                    chapters.append(ks)
+        else:
+            for dd in html.xpath('/html/body/div[3]/div[2]/div/div[1]/ul/li'):
+                if len(dd.xpath('a/@href')) > 0:
+                    name = dd.xpath('a/text()')[0]
+                    s = dd.xpath('a/@href')[0]
+                    if ids.__contains__(name):
+                        continue
+                    chapter = {
+                        'book_id': id,
+                        'link': 'https://www.266ks.com' + s,
+                        'chapter_name': name}
+                    chapters.append(chapter)
+            chapters.reverse()
+
 
     else:
         for dd in html.xpath("//*[@id='list']/dl/dd"):

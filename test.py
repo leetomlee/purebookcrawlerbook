@@ -166,5 +166,8 @@ def get_c(html):
 
 if __name__ == '__main__':
     # content = get_content("https://www.266ks.com/8_8975/5558978.html")
-    content = get_content("http://www.xbiquge.la/15/15977/8321996.html")
-    print(content)
+    # content = get_content("http://www.xbiquge.la/15/15977/8321996.html")
+    # print(content)
+    a=[1,2,3,45]
+    a.reverse()
+    print(a)
