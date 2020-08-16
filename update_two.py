@@ -7,6 +7,7 @@ from concurrent.futures.process import ProcessPoolExecutor
 import pymongo
 # client = pymongo.MongoClient(host='192.168.3.9')
 import requests
+from bson import ObjectId
 from lxml import etree
 
 ex = ProcessPoolExecutor()
@@ -47,9 +48,6 @@ def getHTML(url):
     return html
 
 
-
-
-
 def get_books_from_db():
     find = book.find({"hot": {"$gt": 0}, "status": {"$ne": "完结"}}, {"_id": 1, "link": 1})
     for f in find:
@@ -61,15 +59,6 @@ def get_books_from_db():
             continue
 
 
-def get_chapter_content(url):
-    html = getHTML(url)
-    content = ""
-    for f in html.xpath("//*[@id='content']/text()"):
-        if f != "" and f != "," and f != "\r":
-            content += f
-    return content
-
-
 def updateBook(id, url):
     logging.info("start update  " + url)
     html = getHTML(url)
@@ -79,22 +68,17 @@ def updateBook(id, url):
         ids.append(chp["chapter_name"])
     chapters = []
     if str(url).__contains__("266ks"):
-        for dd in html.xpath('/html/body/div[3]/div[2]/div/div[2]/ul//li'):
-            if len(dd.xpath('a/@href')) > 0:
-                name = dd.xpath('a/text()')[0]
-                s = dd.xpath('a/@href')[0]
-                if ids.__contains__(name):
-                    continue
-                chapter = {
-                    'book_id': id,
-                    'link': 'https://www.266ks.com' + s,
-                    'chapter_name': name}
-                chapters.append(chapter)
+        for option in html.xpath('/html/body/div[3]/div[2]/div/div[3]/span[2]/select/option'):
+            chapters_url = "https://www.266ks.com" + option.xpath('@value')[0]
+            ks = get_chapters_266ks(chapters_url, ids)
+            if len(ks) > 0:
+                chapters.append(ks)
+
     else:
         for dd in html.xpath("//*[@id='list']/dl/dd"):
             if len(dd.xpath('a/@href')) > 0:
-                s = dd.xpath('a/@href').extract_first()
-                name = dd.xpath('a/text()').extract_first()
+                s = dd.xpath('a/@href')[0]
+                name = dd.xpath('a/text()')[0]
                 if ids.__contains__(name):
                     continue
                 chapter = {
@@ -112,19 +96,40 @@ def updateBook(id, url):
                 except Exception as e:
                     logging.error(e)
             logging.info("new add  " + str(len(many.inserted_ids)))
+            update_time = ""
+            latest_chapter_name = ""
+            if str(url).__contains__("266ks"):
+                update_time = html.xpath('/html/body/div[3]/div[1]/div/div/div[2]/div[1]/div/p[5]/text()')[0]
+                latest_chapter_name = html.xpath('/html/body/div[3]/div[2]/div/div[1]/ul/li[1]/a/text()')[0]
+            else:
+                update_time = html.xpath('//*[@id="info"]/p[3]/text()')[0]
+                latest_chapter_name = html.xpath('//*[@id="info"]/p[4]/a/text()')[0]
 
-            update_time = html.xpath("//meta[@property='og:novel:update_time']/@content")[0]
-            latest_chapter_name = html.xpath("//meta[@property='og:novel:latest_chapter_name']/@content")[0]
-            status = html.xpath("//meta[@property='og:novel:status']/@content")[0]
-
-            myquery = {"_id": id}
+            myquery = {"_id": ObjectId(id)}
             newvalues = {
-                "$set": {"u_time": update_time, "last_chapter": latest_chapter_name, "status": status}}
+                "$set": {"u_time": update_time, "last_chapter": latest_chapter_name}}
 
             book.update_one(myquery, newvalues)
             logging.info("book info update " + str(id))
     except Exception as e:
         logging.error(e)
+
+
+def get_chapters_266ks(url, ids):
+    html = getHTML(url)
+    temp = []
+    for dd in html.xpath('/html/body/div[3]/div[2]/div/div[2]/ul//li'):
+        if len(dd.xpath('a/@href')) > 0:
+            name = dd.xpath('a/text()')[0]
+            s = dd.xpath('a/@href')[0]
+            if ids.__contains__(name):
+                continue
+            chapter = {
+                'book_id': id,
+                'link': 'https://www.266ks.com' + s,
+                'chapter_name': name}
+            temp.append(chapter)
+    return temp
 
 
 if __name__ == '__main__':
