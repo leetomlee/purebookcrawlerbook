@@ -12,8 +12,8 @@ DOWNLOAD_DELAY = 0.5
 COOKIES_ENABLED = False
 
 DOWNLOADER_MIDDLEWARES = {
-    'scrapy.contrib.downloadermiddleware.useragent.UserAgentMiddleware': None,
-    'demo3.middlewares.RotateUserAgentMiddleware': 400,
+    # 'scrapy.contrib.downloadermiddleware.useragent.UserAgentMiddleware': None,
+    # 'demo3.middlewares.RotateUserAgentMiddleware': 400,
     # 'demo3.middlewares.ProxyMiddleware': 382,
 
 
@@ -24,7 +24,7 @@ DOWNLOADER_MIDDLEWARES = {
 ITEM_PIPELINES = {
     # 'scrapy.pipelines.images.ImagesPipeline': 2,
     # 'demo3.pipelines.PiaoHuaPipeline': 1
-    'demo3.pipelines.CrawlerScrapyPipeline': 1,
+    # 'demo3.pipelines.CrawlerScrapyPipeline': 1,
     # 'scrapy_redis.pipelines.RedisPipeline': 300
 }
 LOG_LEVEL ='DEBUG'

@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
-import datetime
-import logging
-import time
 
 import pymongo
+from elasticsearch import Elasticsearch
 from redis import StrictRedis
 from scrapy import Selector
 from scrapy.linkextractors import LinkExtractor
@@ -20,14 +18,16 @@ s = 0
 # db = client.admin
 #
 # db.authenticate('lx', 'Lx123456')
-myclient = pymongo.MongoClient('mongodb://lx:Lx123456@120.27.244.128:27017/')
+myclient = pymongo.MongoClient('mongodb://lx:Lx123456@23.91.100.230:27017/')
 mydb = myclient["book"]
 bookDB = mydb["books"]
 chapterDB = mydb["chapters"]
-redis = StrictRedis(host='120.27.244.128', port=6379, db=0, password='zx222lx')
-
-
-
+es = Elasticsearch(
+    ['23.91.100.230:8088'],
+    # 认证信息
+    http_auth=('elastic', 'jXqw0zF3XPOxu8PThv8H')
+)
+redis = StrictRedis(host='23.91.100.230', port=6379, db=0, password='zx222lx')
 
 
 class MeiziSpider(CrawlSpider):
@@ -53,8 +53,13 @@ class MeiziSpider(CrawlSpider):
         author = selector.xpath("//meta[@property='og:novel:author']/@content").extract_first()
         key = book_name + author
         if redis.exists(key):
-            return
-        redis.set(key, '')
+            one = bookDB.find_one({'book_name': book_name, 'author': author})
+            bookDB.delete_one({'book_name': book_name, 'author': author})
+            book_id = str(one['_id'])
+            chapterDB.delete_many({'book_id': book_id})
+
+
+        # redis.set(key, '')
         cover = selector.xpath("//meta[@property='og:image']/@content").extract_first()
         category = selector.xpath("//meta[@property='og:novel:category']/@content").extract_first()
         status = selector.xpath("//meta[@property='og:novel:status']/@content").extract_first()
@@ -77,6 +82,8 @@ class MeiziSpider(CrawlSpider):
         book.add_value('last_chapter', latest_chapter_name)
         item = book.load_item()
         book_id = str(bookDB.insert_one(dict(item)).inserted_id)
+        # index = es.index(index="book", doc_type="book", id=book_id,
+        #                  body={"book_name": book_name, "book_author": author})
         chapters = []
         for dd in selector.xpath("//*[@id='list']/dl/dd"):
             if len(dd.xpath('a/@href')) > 0:
@@ -89,4 +96,3 @@ class MeiziSpider(CrawlSpider):
                 chapters.append(chapter)
         if len(chapters) > 0:
             chapterDB.insert_many(chapters)
-

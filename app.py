@@ -5,6 +5,7 @@ import os
 import random
 import re
 import threading
+import time
 import urllib
 from concurrent.futures import ALL_COMPLETED, wait
 from concurrent.futures.thread import ThreadPoolExecutor
@@ -17,10 +18,11 @@ from flask import Flask, jsonify, request
 from flask_apscheduler import APScheduler
 from lxml import etree
 
-myclient = pymongo.MongoClient('mongodb://lx:Lx123456@120.27.244.128:27017/')
+myclient = pymongo.MongoClient('mongodb://lx:Lx123456@23.91.100.230:27017/', connect=False)
+# myclient = pymongo.MongoClient('mongodb://lx:Lx123456@localhost:27017/')
 mydb = myclient["book"]
-bookDB = mydb["bks"]
-chapterDB = mydb["cps"]
+bookDB = mydb["books"]
+chapterDB = mydb["chapters"]
 user_agent_list = [
     "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/22.0.1207.1 Safari/537.1" \
     "Mozilla/5.0 (X11; CrOS i686 2268.111.0) AppleWebKit/536.11 (KHTML, like Gecko) Chrome/20.0.1132.57 Safari/536.11", \
@@ -53,6 +55,13 @@ class Config(object):  # 创建配置，用类
             'trigger': 'cron',  # interval表示循环任务
             'hour': 1,
         }
+        # {  # 第二个任务，每隔5S执行一次
+        #     'id': 'job3',
+        #     'func': '__main__:get_chapter_content',  # 方法名
+        #     'args': (),  # 入参
+        #     'trigger': 'cron',  # interval表示循环任务
+        #     'hour': 8,
+        # }
     ]
 
 
@@ -65,7 +74,7 @@ app.config.from_object(Config())
 
 logger = app.logger
 
-pool = redis.ConnectionPool(host='120.27.244.128', port=6379, decode_responses=True, password='zx222lx')
+pool = redis.ConnectionPool(host='localhost', port=6379, decode_responses=True, password='zx222lx')
 redis = redis.Redis(connection_pool=pool)
 db = records.Database('mysql+pymysql://root:fKH31da8eqJHIU134ms1@120.27.244.128:3306/ph')
 headers = {
@@ -75,11 +84,18 @@ headers = {
 
 def get_c(html):
     content = ""
-    for text in html.xpath('//*[@id="content"]/text()'):
-        if not str(text).strip() == "":
-            if not str(text).startswith("\n"):
-                if is_chinese(str(text)):
-                    content += "\t\t\t\t\t\t\t\t" + str(text).strip() + "\n"
+    try:
+        for text in html.xpath('//*[@id="content"]/text()'):
+            if not str(text).strip() == "":
+                if not str(text).startswith("\n"):
+                    if is_chinese(str(text)):
+                        content += "\t\t\t\t\t\t\t\t" + str(text).strip() + "\n"
+    except Exception as e:
+        logger.error(e)
+        return ''
+
+    if content.__contains__('DOCTYPE'):
+        return ''
     return content
 
 
@@ -600,23 +616,41 @@ def get_detail(word):
 
 @app.route('/book/chapter', methods=['GET'])
 def get_chapter():
-    url = request.args.get("url")
-    html = getHTMLUtf8(url)
+    retry_cnt = 3
     content = ""
-    if html == None:
-        return content
-    if url.__contains__("xbiquge"):
-        return get_c(html)
-    else:
-        while True:
-            content += get_c(html)
-            next_text = html.xpath('//*[@id="container"]/div/div/div[2]/div[3]/a[3]/text()')[0]
-            html = getHTMLUtf8(
-                "https://www.266ks.com/" + html.xpath('//*[@id="container"]/div/div/div[2]/div[3]/a[3]/@href')[0])
-            if next_text != "下一页":
-                break
+
+    while retry_cnt > 0:
+        url = request.args.get("url")
+        html = getHTMLUtf8(url)
+        if url.__contains__("xbiquge"):
+            content = get_c(html)
+        else:
+            while True:
+                content += get_c(html)
+                next_text = html.xpath('//*[@id="container"]/div/div/div[2]/div[3]/a[3]/text()')[0]
+                html = getHTMLUtf8(
+                    "https://www.266ks.com/" + html.xpath('//*[@id="container"]/div/div/div[2]/div[3]/a[3]/@href')[0])
+                if next_text != "下一页":
+                    break
+        if content == "":
+            retry_cnt -= 1
+        else:
+            break
 
     return content
+
+
+def get_chapter_content():
+    book_ids = []
+    logger.info("开始定时爬取章节数据")
+    for id in bookDB.find({"hot": {"$gt": 1}}, {"_id": 1}):
+        book_ids.append(id['_id'])
+    for book_id in book_ids:
+        for cid in chapterDB.find({"book_id": str(book_id)}, {"_id": 1}):
+            idx = cid["_id"]
+            requests.get("http://localhost:8081/v1/book/chapter/" + str(idx))
+            time.sleep(2)
+    logger.info("定时爬取章节数据完成")
 
 
 def freshIdx():
@@ -704,12 +738,40 @@ def parse_book_detail(id):
     return requests.get("https://book.leetomlee.xyz/v1/book/detail/" + id).text
 
 
+def get_proxy():
+    return requests.get("http://127.0.0.1:5010/get/").json()
+
+
+def delete_proxy(proxy):
+    requests.get("http://127.0.0.1:5010/delete/?proxy={}".format(proxy))
+
+
+def getHTMLzz(param):
+    retry_count = 2
+    proxy = get_proxy().get("proxy")
+    while retry_count > 0:
+        try:
+            get = requests.get(param, proxies={"http": "http://{}".format(proxy)},
+                               headers={"User-Agent": random.choice(user_agent_list)}, timeout=20)
+            logger.error("使用代理 http://{}".format(proxy))
+            return get
+        except Exception as e:
+            retry_count -= 1
+    # 删除代理池中代理
+    delete_proxy(proxy)
+    logger.error("不可用代理")
+    return None
+
+
 def getHTMLUtf8(url):
-    get = requests.get(url, headers={"User-Agent": random.choice(user_agent_list)})
+    get = getHTMLzz(url)
+    if get is None:
+        return get
     if get.status_code == 200:
         get.encoding = "utf-8"
         html = etree.HTML(get.text)
         return html
+    return None
 
 
 def gert_score(name, id, author):
@@ -752,4 +814,4 @@ if __name__ == '__main__':
     scheduler = APScheduler()
     scheduler.init_app(app)
     scheduler.start()
-    app.run(port=8082, host='0.0.0.0')
+    app.run(port=8085, host='0.0.0.0')

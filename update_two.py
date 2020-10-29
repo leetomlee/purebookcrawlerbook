@@ -11,7 +11,8 @@ from bson import ObjectId
 from lxml import etree
 
 ex = ProcessPoolExecutor()
-myclient = pymongo.MongoClient('mongodb://lx:Lx123456@120.27.244.128:27017/')
+# myclient = pymongo.MongoClient('mongodb://lx:Lx123456@localhost:27017/', connect=False)
+myclient = pymongo.MongoClient('mongodb://lx:Lx123456@23.91.100.230:27017/', connect=False)
 mydb = myclient["book"]
 book = mydb["books"]
 chapterDB = mydb["chapters"]
@@ -53,10 +54,11 @@ def get_books_from_db():
     for f in find:
         try:
             updateBook(str(f["_id"]), f["link"])
-            time.sleep(1)
+            # ex.submit(updateBook, str(f["_id"]), f["link"] )
         except Exception as e:
             logging.error(e)
             continue
+    # ex.shutdown(wait=True)
 
 
 def updateBook(id, url):
@@ -67,29 +69,31 @@ def updateBook(id, url):
     for chp in chps:
         ids.append(chp["chapter_name"])
     chapters = []
+    flag = True
     if str(url).__contains__("266ks"):
-        if len(ids) == 0:
+        for dd in html.xpath('/html/body/div[3]/div[2]/div/div[1]/ul//li'):
+            if len(dd.xpath('a/@href')) > 0:
+                name = dd.xpath('a/text()')[0]
+                s = dd.xpath('a/@href')[0]
+                if ids.__contains__(name):
+                    flag = False
+                    continue
+                chapter = {
+                    'book_id': id,
+                    'link': 'https://www.266ks.com' + s,
+                    'chapter_name': name}
 
+                chapters.append(chapter)
+        chapters.reverse()
+        if flag:
+            logging.info("非最新更新")
+            chapters = []
             for option in html.xpath('/html/body/div[3]/div[2]/div/div[3]/span[2]/select/option'):
                 chapters_url = "https://www.266ks.com" + option.xpath('@value')[0]
-                ks = get_chapters_266ks(chapters_url, ids)
+                ks = get_chapters_266ks(chapters_url, ids, id)
+                time.sleep(3)
                 if len(ks) > 0:
-                    chapters.append(ks)
-        else:
-            for dd in html.xpath('/html/body/div[3]/div[2]/div/div[1]/ul/li'):
-                if len(dd.xpath('a/@href')) > 0:
-                    name = dd.xpath('a/text()')[0]
-                    s = dd.xpath('a/@href')[0]
-                    if ids.__contains__(name):
-                        continue
-                    chapter = {
-                        'book_id': id,
-                        'link': 'https://www.266ks.com' + s,
-                        'chapter_name': name}
-                    chapters.append(chapter)
-            chapters.reverse()
-
-
+                    chapters = chapters + ks
     else:
         for dd in html.xpath("//*[@id='list']/dl/dd"):
             if len(dd.xpath('a/@href')) > 0:
@@ -102,18 +106,18 @@ def updateBook(id, url):
                     'link': 'http://www.xbiquge.la' + s,
                     'chapter_name': name}
                 chapters.append(chapter)
-
     try:
         if len(chapters) != 0:
             many = chapterDB.insert_many(chapters)
-            for x in many.inserted_ids:
-                try:
-                    requests.get("https://book.leetomlee.xyz/v1/book/chapter/" + str(x))
-                except Exception as e:
-                    logging.error(e)
+            if not flag:
+                for x in many.inserted_ids:
+                    try:
+                        requests.get("http://23.91.100.230:8081/v1/book/chapter/" + str(x))
+                        time.sleep(5)
+                    except Exception as e:
+                        logging.error(e)
             logging.info("new add  " + str(len(many.inserted_ids)))
-            update_time = ""
-            latest_chapter_name = ""
+            logging.info("insert ok")
             if str(url).__contains__("266ks"):
                 update_time = html.xpath('/html/body/div[3]/div[1]/div/div/div[2]/div[1]/div/p[5]/text()')[0]
                 latest_chapter_name = html.xpath('/html/body/div[3]/div[2]/div/div[1]/ul/li[1]/a/text()')[0]
@@ -131,7 +135,7 @@ def updateBook(id, url):
         logging.error(e)
 
 
-def get_chapters_266ks(url, ids):
+def get_chapters_266ks(url, ids, id):
     html = getHTML(url)
     temp = []
     for dd in html.xpath('/html/body/div[3]/div[2]/div/div[2]/ul//li'):

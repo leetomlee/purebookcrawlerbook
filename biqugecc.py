@@ -30,10 +30,10 @@ user_agent_list = [
 ]
 import pymongo
 
-myclient = pymongo.MongoClient('mongodb://lx:Lx123456@120.27.244.128:27017/')
+myclient = pymongo.MongoClient('mongodb://lx:Lx123456@23.91.100.230:27017/')
 mydb = myclient["book"]
-bookDB = mydb["xbiquge"]
-chapterDB = mydb["xchapter"]
+bookDB = mydb["books"]
+chapterDB = mydb["chapters"]
 site_pre = 'https://www.xbiquge.cc/book'
 domain = 'https://www.xsbiquge.com'
 
@@ -53,128 +53,44 @@ def getHTML(url):
 
 def getBook(u):
     selector = getHTML(u)
-    uid = str(uuid.uuid4())
-    id = ''.join(uid.split('-'))
-    # if ids.__contains__(id):
-    #     return
 
-    book_name = selector.xpath("//meta[@property='og:novel:book_name']/@content")[0]
-    author = selector.xpath("//meta[@property='og:novel:author']/@content")[0]
-    cover = selector.xpath("//meta[@property='og:image']/@content")[0]
-    category = selector.xpath("//meta[@property='og:novel:category']/@content")[0]
-    # status = selector.xpath("//meta[@property='og:novel:status']/@content")[0]
-    update_time = str(selector.xpath('//*[@id="info"]/p[3]/text()')[0]).split("[")[0].strip()
-    latest_chapter_name = selector.xpath(
-        '//*[@id="info"]/p[4]/a/text()')[0]
-    # latest_chapter_url = selector.xpath('//*[@id="info"]/p[4]/a/@href')[0]
-    book_desc = selector.xpath("//meta[@property='og:description']/@content")[0]
-    # key = book_name + author
-    # if bookNameAndAuthors.__contains__(key):
-    #     logging.info("db exist book %s" % book_name)
-    #     return
-    book = {"_id": id,
-            "link": u,
-            "cover": cover,
-            "hot": 0,
-            'book_name': str(book_name).strip(),
-            'author': str(author).strip(),
-            'category': category,
-            'status': "连载中",
-            'book_desc': book_desc,
-            "u_time": update_time[5:],
-            'last_chapter': latest_chapter_name}
-    # book.add_value('last_chapter_id', str(latest_chapter_url).split('/')[-1].split('.')[0])
-    try:
-        bookDB.insert_one(dict(book))
-    except Exception as e:
-        logging.error(e)
 
     chapters = []
     for dd in selector.xpath("//*[@id='list']/dl/dd"):
-        try:
-            if len(dd.xpath('a/@href')) > 0:
-                s = dd.xpath('a/@href')[0]
-                name = dd.xpath('a/text()')[0]
-                chapter = {
-                    'book_id': id,
-                    'chapter_id': id + str(s).split('/')[-1].split('.')[0],
-                    'content': getContent(s),
-                    'chapter_name': name}
-                chapters.append(chapter)
-        except Exception as e:
-            logging.error(e + "dsfdsfs")
+        if len(dd.xpath('a/@href')) > 0:
+            s = dd.xpath('a/@href')[0]
+            name = dd.xpath('a/text()')[0]
+            chapter = {
+                'book_id': "5f8a64b3544c0000200037e2",
+                'link': "http://www.xbiquge.la" + s,
+                'chapter_name': name}
+            chapters.append(chapter)
     if len(chapters) > 0:
-        try:
-            chapterDB.insert_many(chapters)
-        except Exception as e:
-            logging.error(e)
-    logging.info("cc new add %s" % book_name)
+        chapterDB.insert_many(chapters)
+
+def is_chinese(string):
+    """
+    检查整个字符串是否包含中文
+    :param string: 需要检查的字符串
+    :return: bool
+    """
+    for ch in string:
+        if u'\u4e00' <= ch <= u'\u9fff':
+            return True
+
+    return False
 
 
 def getContent(s):
-    ss = []
-    # zhmodel = re.compile(u'[\u4e00-\u9fa5]')
     content = getHTML(domain + s).xpath("//*[@id='content']/text()")
-
-    for i in content:
-        if str(i).strip() == "":
-            continue
-        # match = zhmodel.search(i)
-        # if not match:
-        #     print(i)
-        #     continue
-
-        ss.append(i)
-
-    return "\n".join(ss)
+    c=''
+    for text in content:
+        if not str(text).strip() == "":
+            if not str(text).startswith("\n"):
+                if is_chinese(str(text)):
+                    c += "\t\t\t\t\t\t\t\t" + str(text).strip() + "\n"
+    return c
 
 
 if __name__ == '__main__':
-    getBook("https://www.xsbiquge.com/85_85235/")
-
-    # f = bookDB.find({"book_name": "龙族5悼亡者的归来（龙族Ⅴ：悼亡者的归来）"}, {'_id': 1})
-    # for i in f:
-    #     book_id = i['_id']
-    #     chapterDB.delete_many({"book_id": book_id})
-    #     bookDB.delete_many({"_id": book_id})
-#     cps = chapterDB.find({"book_id": book_id}, {"content": 1, "chapter_name": 1, "_id": 1})
-#     for cp in cps:
-#         cid = cp["_id"]
-#         u = cp["content"]
-#         chapter_name = cp["chapter_name"]
-#
-#         if str(u).strip() == '':
-#             continue
-#         html = getHTML(u)
-#         #     html=getHTML(i['content'])
-#         content = "\n".join(getHTML(u).xpath("//*[@id='content']/text()"))
-#         myquery = {"_id": cid}
-#         newvalues = {
-#             "$set": {"content": content}}
-#
-#         chapterDB.update_one(myquery, newvalues)
-#         print(content)
-
-# try:
-#     for f in find:
-#         try:
-#             bookNameAndAuthors.append(f["book_name"] + f["author"])
-#         except Exception as e:
-#             continue
-#             logging.error(e)
-#     for i in range(1, 100000):
-#         link = site_pre + '/%s/' % str(i)
-#         getBook(link)
-#         logging.info("get %s success" % link)
-# except Exception as e:
-#     logging.error(e)
-
-# with ThreadPoolExecutor() as t:
-#     job_list = []
-#     for i in range(1, 200001):
-#         link = site_pre + '/%s/' % str(i)
-#         logging.info(link)
-#         job_list.append(t.submit(getBook, link))
-#     for future in as_completed(job_list):
-#         data = future.result()
-#         logging.info("get %s success" % link)
+    getBook("http://www.xbiquge.la/15/15977/")
