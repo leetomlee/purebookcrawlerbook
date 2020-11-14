@@ -245,6 +245,59 @@ def getHTMLzz(param):
     # 删除代理池中代理
     delete_proxy(proxy)
     return None
+import datetime
+import time
+from concurrent.futures.process import ProcessPoolExecutor
+
+import pymongo
+
+myclient = pymongo.MongoClient('mongodb://lx:Lx123456@120.27.244.128:27017/')
+mydb = myclient["book"]
+chapterDB = mydb["chapters"]
+myclient1 = pymongo.MongoClient('mongodb://lx:Lx123456@localhost:27017/')
+mydb1 = myclient1["book"]
+
+bookDB1 = mydb1["books"]
+chapterDB1 = mydb1["chapters"]
+
+import logging  # 引入logging模块
+
+logging.basicConfig(level=logging.INFO)  # 设置日志级别
+ex = ProcessPoolExecutor()
+
+
+def get_books_from_db():
+    find = bookDB1.find({}, {"_id": 1, "book_name": 1}, no_cursor_timeout=True)
+    for f in find:
+        try:
+            ex.submit(updateBook, str(f["_id"]), )
+            logging.error("插入" + f["book_name"])
+        except Exception as e:
+            logging.error(e)
+            continue
+    ex.shutdown(wait=True)
+
+
+def updateBook(id):
+    chapters = []
+    chps = chapterDB.find({"book_id": id}, {"content": 0}, no_cursor_timeout=True)
+    for chp in chps:
+        chapters.append({
+            "_id": chp["_id"],
+            "book_id": chp["book_id"],
+            "link": chp["link"],
+            "chapter_name": chp["chapter_name"]
+        })
+
+    try:
+        if len(chapters) != 0:
+            chapterDB1.insert_many(chapters)
+
+    except Exception as e:
+        logging.error(e)
+
+
+
 
 
 if __name__ == '__main__':

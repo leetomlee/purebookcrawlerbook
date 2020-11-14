@@ -1,81 +1,49 @@
-# -*- coding: utf-8 -*-
-import datetime
-import random
-import time
-from concurrent.futures.process import ProcessPoolExecutor
-
-import pymongo
-# client = pymongo.MongoClient(host='192.168.3.9')
-import requests
-from lxml import etree
-
-ex = ProcessPoolExecutor()
-myclient = pymongo.MongoClient('mongodb://lx:Lx123456@120.27.244.128:27017/')
-mydb = myclient["book"]
-book = mydb["books"]
-chapterDB = mydb["chapters"]
-user_agent_list = [
-    "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/22.0.1207.1 Safari/537.1" \
-    "Mozilla/5.0 (X11; CrOS i686 2268.111.0) AppleWebKit/536.11 (KHTML, like Gecko) Chrome/20.0.1132.57 Safari/536.11", \
-    "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.6 (KHTML, like Gecko) Chrome/20.0.1092.0 Safari/536.6", \
-    "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.6 (KHTML, like Gecko) Chrome/20.0.1090.0 Safari/536.6", \
-    "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/19.77.34.5 Safari/537.1", \
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.9 Safari/536.5", \
-    "Mozilla/5.0 (Windows NT 6.0) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.36 Safari/536.5", \
-    "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3", \
-    "Mozilla/5.0 (Windows NT 5.1) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3", \
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_0) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3", \
-    "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1062.0 Safari/536.3", \
-    "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1062.0 Safari/536.3", \
-    "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3", \
-    "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3", \
-    "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3", \
-    "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.0 Safari/536.3", \
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24", \
-    "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24"
-]
-
 import logging  # 引入logging模块
-
+from concurrent.futures._base import as_completed
+from concurrent.futures.process import ProcessPoolExecutor
+import pymongo
+import requests
+from loguru import logger
+ex = ProcessPoolExecutor()
 logging.basicConfig(level=logging.INFO)  # 设置日志级别
+myclient = pymongo.MongoClient('mongodb://lx:Lx123456@localhost:27017/', connect=False)
+# myclient = pymongo.MongoClient('mongodb://lx:Lx123456@23.91.100.230:27017/', connect=False)
+
+mydb = myclient["book"]
+bookDB = mydb["books"]
+chapterDB = mydb["chapters"]
 
 
-def getHTML(url):
-    get = requests.get(url, headers={"User-Agent": random.choice(user_agent_list)})
-    get.encoding = "utf-8"
-    html = etree.HTML(get.text)
-    return html
-
-
-def get_books_from_db():
-    find = book.find({"hot": {"$gt": 0}, "status": {"$ne": "完结"}}, {"_id": 1})
-    for f in find:
+def get_chapters_by_book_id(book_id):
+    for cid in chapterDB.find({"book_id": book_id}, {"_id": 1, "content": 1}):
+        flag = False
         try:
-            for cpid in chapterDB.find({"book_id": str(f["_id"])}, {"_id": 1, "content": 1}):
-                try:
-                    cpid["content"]
-                    logging.info("存在")
-                except Exception as e:
-                    updateBook(str(cpid["_id"]))
-                    time.sleep(10)
-                    continue
+            if cid['content'] == '':
+                flag = True
         except Exception as e:
-            logging.error(e)
-            continue
+            logger.error(e)
+            flag = True
 
-
-def updateBook(id):
-    try:
-        requests.get("https://newbook.leetomlee.xyz/v1/book/chapter/" + id)
-    except Exception as e:
-        logging.error(e)
+        try:
+            if flag:
+                idx = cid["_id"]
+                requests.get("http://localhost:8083/v1/book/chapter/" + str(idx))
+                # requests.get("http://23.91.100.230:8081/v1/book/chapter/" + str(idx))
+                logger.info('爬取章节' + str(idx) + "success")
+        except Exception as e:
+            logger.error(e)
 
 
 if __name__ == '__main__':
-    while True:
-        stime = datetime.datetime.now()
-        logging.info("start update  " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
-        get_books_from_db()
-        logging.info("end update  " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
-        etime = datetime.datetime.now()
-        logging.info("used_time  " + str((etime - stime).seconds))
+    logger.info("开始定时爬取章节数据")
+    book_ids=[]
+    for id in bookDB.find({"hot": {"$gt": 1}}, {"_id": 1, "book_name": 1}):
+        logger.info("开始爬取" + id['book_name'])
+        book_ids.append(str(id["_id"]))
+        # ex.submit(get_chapters_by_book_id, str(id["_id"]))
+    # ex.shutdown(wait=True)
+    all_task = [ex.submit(get_chapters_by_book_id, book_id) for book_id in book_ids]
+    for future in as_completed(all_task):
+        data = future.result()
+    print("in main: get page {}s success".format(data))
+    logger.info("定时爬取章节数据完成")
