@@ -315,6 +315,19 @@ def GetOtherParam(firstUrl, SecUrl, type, vKey, rule):
             return respon.text.split('\n')[2]
 
 
+@app.route('/mp3/<string:url>', methods=['GET'])
+def mp3(url):
+    html = getHTML(url)
+    scripts = html.xpath('//script')
+    skey = scripts[1].text
+    skey = str(skey).split("'")[1]
+
+    url = str(scripts[6].text)
+    urls = re.findall('https?://(?:[-\w.]|(?:%[\da-fA-F]{2})).*?=', url)
+    mp3link = urls[0] + skey
+    return jsonify(json.loads(mp3link))
+
+
 @app.route('/hot', methods=['GET'])
 def movies():
     url = 'https://91mjw.com/alltop_hit'
