@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <meta name="keywords" content="凡人修仙传-有声小说-第1集,忘语,大灰狼"/>
+    <meta name="description" content="凡人修仙传-有声小说-第1集,忘语,大灰狼"/>
+    <link rel="icon" href="https://www.yousxs.com/ico/favicon.ico"/>
+    <title>凡人修仙传-有声小说-第1集</title>
+<!--    <link href="https://www.yousxs.com/css/bootstrap.min.css" rel="stylesheet"/>-->
+<!--    <link href="https://www.yousxs.com/css/bootstrap-theme.min.css" rel="stylesheet"/>-->
+<!--    <link href="https://www.yousxs.com/css/ie10-viewport-bug-workaround.css" rel="stylesheet"/>-->
+<!--    <link href="https://www.yousxs.com/css/index.css" rel="stylesheet"/>-->
+<!--    <link href="https://www.yousxs.com/css/APlayer.min.css" rel="stylesheet"/>-->
+<!--    <link href="https://www.yousxs.com/historyListenIn?name=凡人修仙传-有声小说-第1集&amp;url=player/19967_1.html"-->
+<!--          rel="stylesheet"/>-->
+<!--    <script src="https://www.yousxs.com/js/ie-emulation-modes-warning.js"></script>-->
+    <script>            var skey = 'fcdd1f84fe7442cf961b544462b18a34';
+    console.log(skey)
+    </script>
+</head>
+
+<img src="https://www.yousxs.com/img/classify.jpg" class="img-responsive"/>
+</div>
+<div id="aplayer" style="margin: 0px;margin-bottom: 8px;"></div>
+<script src="https://www.yousxs.com/js/jquery-3.3.1.js"></script>
+<!--<script src="https://www.yousxs.com/js/docs.min.js"></script>-->
+<script src="https://www.yousxs.com/js/APlayer.min.js"></script>
+<script src="https://www.yousxs.com/js/bootstrap.min.js"></script>
+<script>
+    console.log(skey)
+    const ap = new APlayer({
+        container: document.getElementById('aplayer'),
+        theme: "#054cd2",
+        volume: 1,
+        audio: [{
+            name: '凡人修仙传-有声小说-第1集',
+            artist: '大灰狼',
+            url: 'https://audio.yousxs.com:9002/mydate/玄幻小说/2009/凡人修仙传/凡人修仙传001.mp3?skey=' + skey,
+            cover: 'https://www.yousxs.com/img/default.png'
+        }]
+    });
+    ap.on('ended', function () {
+        window.location.href = "19967_2.html";
+    });
+    ap.play();
+</script>
+<script src="https://www.yousxs.com/js/ie10-viewport-bug-workaround.js"></script>
+</body>
+</html>

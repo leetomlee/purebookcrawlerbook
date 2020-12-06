@@ -11,15 +11,14 @@ from concurrent.futures import ALL_COMPLETED, wait
 from concurrent.futures.thread import ThreadPoolExecutor
 
 import pymongo
-import records
-import redis
+import redis as redis
 import requests
 from flask import Flask, jsonify, request
 from flask_apscheduler import APScheduler
 from lxml import etree
 
-myclient = pymongo.MongoClient('mongodb://lx:Lx123456@23.91.100.230:27017/', connect=False)
-# myclient = pymongo.MongoClient('mongodb://lx:Lx123456@localhost:27017/')
+# myclient = pymongo.MongoClient('mongodb://lx:Lx123456@23.91.100.230:27017/', connect=False)
+myclient = pymongo.MongoClient('mongodb://lx:Lx123456@localhost:27017/')
 mydb = myclient["book"]
 bookDB = mydb["books"]
 chapterDB = mydb["chapters"]
@@ -73,13 +72,10 @@ app = Flask(__name__)
 app.config.from_object(Config())
 
 logger = app.logger
-
+# pool = redis.ConnectionPool(host='23.91.100.230', port=6379, decode_responses=True, password='zx222lx')
 pool = redis.ConnectionPool(host='localhost', port=6379, decode_responses=True, password='zx222lx')
 redis = redis.Redis(connection_pool=pool)
-db = records.Database('mysql+pymysql://root:fKH31da8eqJHIU134ms1@120.27.244.128:3306/ph')
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.84 Safari/537.36',
-}
+
 
 
 def get_c(html):
@@ -342,8 +338,173 @@ def movies():
             movies.append({'cover': article.xpath('a/div/img/@data-original')[0],
                            'id': str(article.xpath('a/@href')[0]).split('/')[-1],
                            'name': article.xpath('a/h2/text()')[0]})
-        redis.set(url, json.dumps(movies), ex=60 * 120)
+        redis.set(url, json.dumps(movies))
         return jsonify(movies)
+
+
+@app.route('/voice', methods=['GET'])
+def voice():
+    link = 'https://www.yousxs.com/' + request.args.get("url")
+    redis.delete(link)
+    if redis.exists(link):
+        return jsonify(json.loads(redis.get(link)))
+    session = requests.session()
+
+    req = session.get(link, headers={"User-Agent": random.choice(user_agent_list)})
+    req.encoding = "utf-8"
+    html = etree.HTML(req.text)
+    text = session.get('https://www.yousxs.com/js/bootstrap.min.js',
+                       headers={"User-Agent": random.choice(user_agent_list)}).text
+    split = text.split(";")
+    skey = str(split[-2]).split('=')[1][1:-1]
+
+    scripts = html.xpath('//script')
+    url = str(scripts[6].text)
+    urls = re.findall('https?://(?:[-\w.]|(?:%[\da-fA-F]{2})).*?=', url)
+    mp3link = urls[0] + skey
+
+    s = {
+        "url": mp3link
+    }
+    redis.set(link, json.dumps(s, ensure_ascii=False))
+
+    return jsonify(s)
+
+
+@app.route('/voice/detail', methods=['GET'])
+def voice_detail():
+    key = request.args.get("key")
+    if redis.exists(key):
+        return jsonify(json.loads(redis.get(key)))
+    session = requests.session()
+    req = session.get('https://www.yousxs.com/' + key,
+                      headers={"User-Agent": random.choice(user_agent_list)})
+    req.encoding = "utf-8"
+    html = etree.HTML(req.text)
+    _chapters = []
+    for chapter in html.xpath('/html/body/div/div[3]/div[1]/div[2]/div/div//div'):
+        try:
+            _chapters.append({
+                "link": chapter.xpath('a/@href')[0],
+                "name": chapter.xpath('a/text()')[0],
+            })
+        except Exception as e:
+            pass
+    title = html.xpath('/html/body/div/div[3]/div[1]/div[1]/div/div/div[2]/h3/'
+                       'text()')[0]
+    author = html.xpath('/html/body/div/div[3]/div[1]/div[1]/div/div/div[2]/p[1]/text()')[0],
+    bookDesc = html.xpath('/html/body/div/div[3]/div[1]/div[1]/div/div/div[2]/p[2]/text()')[0],
+    find = bookDB.find({"book_name": title}, {"cover": 1})
+    cover = ''
+    try:
+        cover = find[0]['cover']
+    except Exception as e:
+        pass
+    data = {
+        "title": title,
+        "author": author[0],
+        'bookDesc': bookDesc[0],
+        "chapters": _chapters,
+        "cover": cover
+    }
+    redis.set(key, json.dumps(data, ensure_ascii=False))
+
+    return jsonify(data)
+
+
+@app.route('/voice/index', methods=['GET'])
+def voice_index():
+    key = "voice_idx"
+    if redis.exists(key):
+        return jsonify(json.loads(redis.get(key)))
+    session = requests.session()
+
+    req = session.get('https://www.yousxs.com',
+                      headers={"User-Agent": random.choice(user_agent_list)})
+    req.encoding = "utf-8"
+    html = etree.HTML(req.text)
+    _bks = []
+    rows = html.xpath('/html/body/div//div[@class="row"]')
+    _bks.append(get_div(rows[0].xpath('div')[1]))
+    for row in rows[1].xpath('div'):
+        _bks.append(get_div(row))
+    for row in rows[3].xpath('div'):
+        _bks.append(get_div(row))
+
+    redis.set(key, json.dumps(_bks), ex=60 * 120)
+    return jsonify(_bks)
+
+
+def get_div(div):
+    head = div.xpath('div')[0].xpath('div')[0]
+    cate = head.xpath('div')[0].xpath('div')[0].xpath('text()')[0]
+    link = head.xpath('div')[0].xpath('div')[1].xpath('a')[0].xpath('@href')[0]
+    _books = []
+    for li in div.xpath('div')[0].xpath('div')[1].xpath('ul')[0].xpath('li'):
+        try:
+            _books.append({
+                "link": li.xpath('a/@href')[0],
+                "name": li.xpath('a/text()')[0],
+                "date": li.xpath('span/text()')[0],
+            })
+        except Exception as e:
+            pass
+    return {
+        'cate': cate, 'link': link, 'voices': _books
+    }
+
+
+@app.route('/voice/search', methods=['GET'])
+def voice_search():
+    key = request.args.get("key")
+    if redis.exists(key):
+        return jsonify(json.loads(redis.get(key)))
+    session = requests.session()
+
+    req = session.get('https://www.yousxs.com/classify.html?novelName=' + key,
+                      headers={"User-Agent": random.choice(user_agent_list)})
+    req.encoding = "utf-8"
+    html = etree.HTML(req.text)
+    _bks = []
+    for li in html.xpath('/html/body/div/div[5]/div/div/div[2]/ul//li'):
+        href = li.xpath('a/@href')[0]
+        title = li.xpath('a/text()')[0]
+        date = li.xpath('span/text()')[0]
+        _bks.append({
+            "href": href, "title": title, "date": date
+        })
+
+    redis.set(key, json.dumps(_bks), ex=60 * 120)
+    return jsonify(_bks)
+
+
+@app.route('/voice/more', methods=['POST'])
+def voice_more():
+    # key = request.args.get("key")
+    data = request.get_data()
+
+    loads = json.loads(data.decode('utf-8'))
+    key = loads.get('key')
+
+    if redis.exists(key):
+        return jsonify(json.loads(redis.get(key)))
+    session = requests.session()
+
+    req = session.get('https://www.yousxs.com/' + key,
+                      headers={"User-Agent": random.choice(user_agent_list)})
+    req.encoding = "utf-8"
+    html = etree.HTML(req.text)
+    _bks = []
+    for li in html.xpath('/html/body/div/div[5]/div/div/div[2]/ul//li'):
+        href = li.xpath('a/@href')[0]
+        title = li.xpath('a/text()')[0]
+        date = li.xpath('span/text()')[0]
+        _bks.append({
+            "href": href, "title": title, "date": date
+        })
+
+    redis.set(key, json.dumps(_bks), ex=60 * 120)
+    return jsonify(_bks)
 
 
 @app.route('/moviehot', methods=['GET'])
@@ -827,4 +988,6 @@ if __name__ == '__main__':
     scheduler = APScheduler()
     scheduler.init_app(app)
     scheduler.start()
-    app.run(port=8085, host='0.0.0.0')
+    app.config['JSON_AS_ASCII'] = False
+
+    app.run(port=8012, host='0.0.0.0')

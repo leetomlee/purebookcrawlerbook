@@ -3,5 +3,5 @@ requests
 pymongo
 pillow
 lxml
-
+flask_apscheduler
 scrapy
