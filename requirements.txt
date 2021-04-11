@@ -1,7 +1,10 @@
 requests
-
+redis
 pymongo
 pillow
 lxml
 flask_apscheduler
 scrapy
+elasticsearch
+gunicorn
+loguru

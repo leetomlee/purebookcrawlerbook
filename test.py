@@ -11,34 +11,18 @@ from elasticsearch import Elasticsearch
 from lxml import etree
 from redis import StrictRedis
 
+from demo3.settings import user_agent_list
+
 ex = ProcessPoolExecutor()
 # myclient = pymongo.MongoClient('mongodb://lx:Lx123456@localhost:27017/', connect=False)
-redis = StrictRedis(host='23.91.100.230', port=6379, db=1, password='zx222lx')
-myclient = pymongo.MongoClient('mongodb://lx:Lx123456@23.91.100.230:27017/', connect=False)
+# redis = StrictRedis(host='23.91.100.230', port=6379, db=1, password='zx222lx')
+redis = StrictRedis(host='localhost', port=6379, db=1, password='zx222lx')
+myclient = pymongo.MongoClient('mongodb://lx:Lx123456@134.175.83.19:27017/', connect=False)
+# myclient = pymongo.MongoClient('mongodb://lx:Lx123456@localhost:27017/', connect=False)
 mydb = myclient["book"]
 bookDB = mydb["books"]
 chapterDB = mydb["chapters"]
 accountDB = mydb["account"]
-user_agent_list = [
-    "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/22.0.1207.1 Safari/537.1" \
-    "Mozilla/5.0 (X11; CrOS i686 2268.111.0) AppleWebKit/536.11 (KHTML, like Gecko) Chrome/20.0.1132.57 Safari/536.11", \
-    "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.6 (KHTML, like Gecko) Chrome/20.0.1092.0 Safari/536.6", \
-    "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.6 (KHTML, like Gecko) Chrome/20.0.1090.0 Safari/536.6", \
-    "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/19.77.34.5 Safari/537.1", \
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.9 Safari/536.5", \
-    "Mozilla/5.0 (Windows NT 6.0) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.36 Safari/536.5", \
-    "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3", \
-    "Mozilla/5.0 (Windows NT 5.1) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3", \
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_0) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3", \
-    "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1062.0 Safari/536.3", \
-    "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1062.0 Safari/536.3", \
-    "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3", \
-    "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3", \
-    "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3", \
-    "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.0 Safari/536.3", \
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24", \
-    "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24"
-]
 
 import logging  # 引入logging模块
 
@@ -53,7 +37,7 @@ def getHTML(url):
 
 
 def get_books_from_db():
-    find = book.find({"hot": {"$gt": 0}, "status": {"$ne": "完结"}}, {"_id": 1, "link": 1})
+    find = bookDB.find({"hot": {"$gt": 0}, "status": {"$ne": "完结"}}, {"_id": 1, "link": 1})
     for f in find:
         try:
             updateBook(str(f["_id"]), f["link"])
@@ -219,7 +203,7 @@ def get_chapters_266ks(url, ids, id):
 
 
 es = Elasticsearch(
-    ['23.91.100.230:8088'],
+    ['localhost:8088'],
     # 认证信息
     http_auth=('elastic', 'jXqw0zF3XPOxu8PThv8H')
 )
@@ -245,70 +229,51 @@ def getHTMLzz(param):
     # 删除代理池中代理
     delete_proxy(proxy)
     return None
-import datetime
-import time
-from concurrent.futures.process import ProcessPoolExecutor
-
-import pymongo
-
-myclient = pymongo.MongoClient('mongodb://lx:Lx123456@120.27.244.128:27017/')
-mydb = myclient["book"]
-chapterDB = mydb["chapters"]
-myclient1 = pymongo.MongoClient('mongodb://lx:Lx123456@localhost:27017/')
-mydb1 = myclient1["book"]
-
-bookDB1 = mydb1["books"]
-chapterDB1 = mydb1["chapters"]
-
-import logging  # 引入logging模块
-
-logging.basicConfig(level=logging.INFO)  # 设置日志级别
-ex = ProcessPoolExecutor()
 
 
-def get_books_from_db():
-    find = bookDB1.find({}, {"_id": 1, "book_name": 1}, no_cursor_timeout=True)
-    for f in find:
+def put_data_to_es():
+    ones = bookDB.find({}, {"_id": 1, "book_name": 1, "author": 1})
+    for one in ones:
+        book_id = ''
+        book_name = ''
+        book_author = ''
         try:
-            ex.submit(updateBook, str(f["_id"]), )
-            logging.error("插入" + f["book_name"])
+            book_id = one['_id']
+        except Exception as e:
+            pass
+        try:
+            book_name = one['book_name']
+
+        except Exception as e:
+            pass
+        try:
+            book_author = one['author']
+
+        except Exception as e:
+            pass
+        print(book_id, book_name, book_author)
+        index = es.index(index="book", doc_type="book", id=book_id,
+                         body={"book_name": book_name, "book_author": book_author})
+        print(index)
+
+
+def put_data_to_redis():
+    for book in bookDB.find({}, {"book_name": 1, "author": 1}):
+        book_name = ''
+        author = ''
+        try:
+            book_name = book['book_name']
         except Exception as e:
             logging.error(e)
-            continue
-    ex.shutdown(wait=True)
-
-
-def updateBook(id):
-    chapters = []
-    chps = chapterDB.find({"book_id": id}, {"content": 0}, no_cursor_timeout=True)
-    for chp in chps:
-        chapters.append({
-            "_id": chp["_id"],
-            "book_id": chp["book_id"],
-            "link": chp["link"],
-            "chapter_name": chp["chapter_name"]
-        })
-
-    try:
-        if len(chapters) != 0:
-            chapterDB1.insert_many(chapters)
-
-    except Exception as e:
-        logging.error(e)
-
-
-
+        try:
+            author = book['author']
+        except Exception as e:
+            logging.error(e)
+        key = book_name + author
+        redis.set(key, '')
 
 
 if __name__ == '__main__':
-    book_ids = []
-    for id in bookDB.find({"hot": {"$gt": 1}}, {"_id": 1}):
-        book_ids.append(id['_id'])
-    for book_id in book_ids:
-        for cid in chapterDB.find({"book_id": str(book_id)}, {"_id": 1}):
-            idx = cid["_id"]
-
-
     # idss = set()
     # acts = accountDB.find({}, {"ids": 1, "_id": 1, 'last_alive_date': 1, 'name': 1})
     # for act in acts:
@@ -326,36 +291,24 @@ if __name__ == '__main__':
     #     for cid in chapterDB.find({'book_id': id}, {'_id': 1}):
     #         s = str(cid['_id'])
     #         getHTMLzz('http://23.91.100.230:8081/v1/book/chapter/' + s)
-    # cs=[]
-    # for c in chapterDB.find({"book_id":"5f8c12ba4e530000ad0023c2"}):
-    #     cs.append(str(c['_id']))
-    # for i in reversed(cs):
-    #     requests.get('http://localhost:8081/v1/book/chapter/'+i)
-    #     time.sleep(5)
+    # for book in bookDB.find():
+    #     pass
+    for book in bookDB.find({"type": "266ks"}):
+        bid = book['_id']
+        print(bid)
+        chapterDB.delete_many({"book_id": bid})
+        bookDB.delete_one({"_id": ObjectId(bid)})
+        # try:
+        #     author = book['author']
+        #     book_name = book['book_name']
+        # except Exception as e:
+        #     bid = book["_id"]
+        #     myquery = {"_id": ObjectId(bid)}
+        #     chapterDB.delete_many({"book_id": bid})
+        #     bookDB.delete_one(myquery)
+        #     logging.error(e)
 
-    # ones = bookDB.find({“”}, {"_id": 1, "book_name": 1, "author": 1})
-    # for one in ones:
-    #     book_id = ''
-    #     book_name = ''
-    #     book_author = ''
-    #     try:
-    #         book_id = one['_id']
-    #     except Exception as e:
-    #         pass
-    #     try:
-    #         book_name = one['book_name']
-    #
-    #     except Exception as e:
-    #         pass
-    #     try:
-    #         book_author = one['author']
-    #
-    #     except Exception as e:
-    #         pass
-    #     print(book_id, book_name, book_author)
-    # index = es.index(index="book", doc_type="book", id="5f8c12ba4e530000ad0023c2",
-    #                  body={"book_name": "大梦主", "book_author": "忘语"})
-    # print(index)
+    # put_data_to_redis()
 # es.indices.create(index='book')
 
 # get_books()

@@ -6,9 +6,11 @@ import pymongo
 import requests
 from lxml import etree
 
-myclient = pymongo.MongoClient('mongodb://lx:Lx123456@120.27.244.128:27017/')
+myclient = pymongo.MongoClient('mongodb://lx:Lx123456@localhost:27017/', connect=False)
+# myclient = pymongo.MongoClient('mongodb://lx:Lx123456@23.91.100.230:27017/', connect=False)
+
 mydb = myclient["book"]
-book = mydb["bks"]
+book = mydb["books"]
 rank = mydb["rank"]
 
 user_agent_list = [
@@ -75,7 +77,7 @@ def get_feMale_rank():
                     html = getHTML("https:" + link)
                     cover = "https:" + str(html.xpath('//*[@id="bookImg"]/img/@src')[0]).strip()
                     # find = book.find_one({"book_name": book_name, "author": author}, {"_id": 1, "cover": 1})
-                    ids.append({"cover": cover, "name": book_name, "author": author})
+                    ids.append({"cover": "/".join(cover.split("/")[:-1]) + "/600", "name": book_name, "author": author})
                 except Exception as e:
                     logging.error(e)
         feMaleRank[text] = ids
@@ -107,7 +109,7 @@ def get_male_rank():
                 html = getHTML("https:" + link)
                 cover = "https:" + str(html.xpath('//*[@id="bookImg"]/img/@src')[0]).strip()
                 # find = book.find_one({"book_name": book_name, "author": author}, {"_id": 1, "cover": 1})
-                ids.append({"cover": cover, "name": book_name, "author": author})
+                ids.append({"cover": "/".join(cover.split("/")[:-1]) + "/600", "name": book_name, "author": author})
             except Exception as e:
                 logging.error(e)
         maleRank[text] = ids

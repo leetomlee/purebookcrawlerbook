@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 import json
 import random
-import time
 
 import pymongo
 # client = pymongo.MongoClient(host='192.168.3.9')
 import requests
 from lxml import etree
 
-myclient = pymongo.MongoClient('mongodb://lx:Lx123456@120.27.244.128:27017/')
+myclient = pymongo.MongoClient('mongodb://lx:Lx123456@localhost:27017/')
+# myclient = pymongo.MongoClient('mongodb://lx:Lx123456@23.91.100.230:27017/', connect=False)
 mydb = myclient["book"]
-book = mydb["xbiquge"]
+book = mydb["books"]
 
 user_agent_list = [
     "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/22.0.1207.1 Safari/537.1" \
@@ -46,14 +46,17 @@ def getHTML(url):
 
 
 def getScores():
-    find = book.find({}, {"_id": 1, "author": 1, "book_name": 1, "rate": 1})
+
+    find = book.find({}, {"_id": 1, "author": 1, "book_name": 1, "rate": 1, "hot": 1, "cover": 1})
     for f in find:
         try:
-            f["rate"]
-            continue
+            if str(f['cover']).__contains__("yuewen"):
+                continue
         except Exception as e:
             print(e)
         try:
+
+            print(f["hot"])
             id = f["_id"]
             author = f["author"]
             name = f["book_name"]
@@ -82,45 +85,16 @@ def getScores():
                     f['status'] = bookStatus
                     f['rate'] = rate
                     myquery = {"_id": id}
-                    newvalues = {"$set": {"cover": bookImgUrl, "status": bookStatus, "rate": rate}}
+                    newvalues = {"$set": {"cover": "/".join(bookImgUrl.split("/")[:-1]) + "/600", "status": bookStatus,
+                                          "rate": rate}}
                     logging.info(name + author + str(rate))
                     book.update_one(myquery, newvalues)
-                    time.sleep(3)
+
                 else:
                     continue
         except Exception as e:
             logging.error(e)
             continue
-
-
-def gert_score(name, id, author):
-    url = "https://www.qidian.com/search?kw=%s" % name
-
-    html = getHTML(url)
-    lis = html.xpath("//*[@id='result-list']/div/ul/li")
-    for li in lis:
-        bookInfoUrl = "https:" + li.xpath("div/a/@href")[0]
-        bookImgUrl = "https:" + li.xpath('div/a/img/@src')[0]
-        bookNames = li.xpath("div[2]/h4/a/text()")
-        if len(bookNames) == 0:
-            bookNames = li.xpath("div[2]/h4/a/cite/text()")
-            if len(bookNames) == 0:
-                continue
-        bookName = bookNames[0]
-        bookAuthor = li.xpath("div[2]/p[1]/a[1]/text()")[0]
-        bookStatus = li.xpath("div[2]/p/span/text()")[0]
-        if str(name).__contains__(bookName) and author == bookAuthor:
-            u = 'https://book.qidian.com/ajax/comment/index?_csrfToken=VyDQJGV3vLqNzMY8pduwEYAAfT1tla9d0A67VoII&bookId=' + str(
-                bookInfoUrl.split('/')[-1]) + '&pageSize=15'
-            res = requests.get(u).text
-            rate = json.loads(res)['data']['rate']
-            if not str(rate).__contains__('.'):
-                rate = float(str(rate) + '.0')
-
-            myquery = {"_id": id}
-            newvalues = {"$set": {"cover": bookImgUrl, "status": bookStatus, "rate": rate}}
-            logging.info(name + author + str(rate))
-            book.update_one(myquery, newvalues)
 
 
 if __name__ == '__main__':

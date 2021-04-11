@@ -5,7 +5,6 @@ import os
 import random
 import re
 import threading
-import time
 import urllib
 from concurrent.futures import ALL_COMPLETED, wait
 from concurrent.futures.thread import ThreadPoolExecutor
@@ -17,8 +16,41 @@ from flask import Flask, jsonify, request
 from flask_apscheduler import APScheduler
 from lxml import etree
 
-# myclient = pymongo.MongoClient('mongodb://lx:Lx123456@23.91.100.230:27017/', connect=False)
-myclient = pymongo.MongoClient('mongodb://lx:Lx123456@localhost:27017/')
+executor = ThreadPoolExecutor(max_workers=6)
+
+
+class Config(object):  # 创建配置，用类
+    # 任务列表
+    JOBS = [
+        {  # 第二个任务，每隔5S执行一次
+            'id': 'job2',
+            'func': '__main__:freshIdx',  # 方法名
+            'args': (),  # 入参
+            'trigger': 'cron',  # interval表示循环任务
+            'hour': 1,
+        }
+        # {  # 第二个任务，每隔5S执行一次
+        #     'id': 'job3',
+        #     'func': '__main__:get_chapter_content',  # 方法名
+        #     'args': (),  # 入参
+        #     'trigger': 'cron',  # interval表示循环任务
+        #     'hour': 8,
+        # }
+    ]
+
+
+# logger.add("%s.log" % __file__.rstrip('.py'),
+#            format="{time:MM-DD HH:mm:ss} {level} {message}")
+app = Flask(__name__)
+
+app.config.from_object(Config())
+
+logger = app.logger
+pool = redis.ConnectionPool(host='134.175.83.19', port=6379, decode_responses=True, password='zx222lx')
+# pool = redis.ConnectionPool(host='localhost', port=6379, decode_responses=True, password='zx222lx')
+redis = redis.Redis(connection_pool=pool)
+myclient = pymongo.MongoClient('mongodb://lx:Lx123456@134.175.83.19:27017/', connect=False)
+# myclient = pymongo.MongoClient('mongodb://lx:Lx123456@localhost:27017/')
 mydb = myclient["book"]
 bookDB = mydb["books"]
 chapterDB = mydb["chapters"]
@@ -42,40 +74,7 @@ user_agent_list = [
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24", \
     "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24"
 ]
-
-
-class Config(object):  # 创建配置，用类
-    # 任务列表
-    JOBS = [
-        {  # 第二个任务，每隔5S执行一次
-            'id': 'job2',
-            'func': '__main__:freshIdx',  # 方法名
-            'args': (),  # 入参
-            'trigger': 'cron',  # interval表示循环任务
-            'hour': 1,
-        }
-        # {  # 第二个任务，每隔5S执行一次
-        #     'id': 'job3',
-        #     'func': '__main__:get_chapter_content',  # 方法名
-        #     'args': (),  # 入参
-        #     'trigger': 'cron',  # interval表示循环任务
-        #     'hour': 8,
-        # }
-    ]
-
-
-executor = ThreadPoolExecutor(max_workers=6)
-# logger.add("%s.log" % __file__.rstrip('.py'),
-#            format="{time:MM-DD HH:mm:ss} {level} {message}")
-app = Flask(__name__)
-
-app.config.from_object(Config())
-
-logger = app.logger
-# pool = redis.ConnectionPool(host='23.91.100.230', port=6379, decode_responses=True, password='zx222lx')
-pool = redis.ConnectionPool(host='localhost', port=6379, decode_responses=True, password='zx222lx')
-redis = redis.Redis(connection_pool=pool)
-
+headers = {"User-Agent": random.choice(user_agent_list)}
 
 
 def get_c(html):
@@ -94,7 +93,22 @@ def get_c(html):
         return ''
     return content
 
+def get_c1(html):
+    content = ""
+    try:
+        for t in html.xpath('//*[@id="content"]/p'):
+            text=t.xpath('text()')[0]
+            if not str(text).strip() == "":
+                if not str(text).startswith("\n"):
+                    if is_chinese(str(text)):
+                        content += "\t\t\t\t\t\t\t\t" + str(text).strip() + "\n"
+    except Exception as e:
+        logger.error(e)
+        return ''
 
+    if content.__contains__('DOCTYPE'):
+        return ''
+    return content
 def is_chinese(string):
     """
     检查整个字符串是否包含中文
@@ -181,7 +195,7 @@ def GetVkeyParam(firstUrl, secUrl, rule):
         "Referer": firstUrl
     }
 
-    html = etree.HTML(requests.get(firstUrl + secUrl + '.html', headers=heads).text)
+    html = etree.HTML(requests.get(firstUrl + secUrl + '.html', headers=headers).text)
     tem = []
     a1 = ''
     a2 = ''
@@ -257,7 +271,8 @@ def GetDownloadUrl(payload, refereUrl):
         "X-Requested-With": "XMLHttpRequest"
     }
     while True:
-        retData = json.loads(requests.post("https://api.1suplayer.me/player/api.php", data=payload, headers=heads).text)
+        retData = json.loads(
+            requests.post("https://api.1suplayer.me/player/api.php", data=payload, headers=headers).text)
         if retData["code"] == 200:
             return retData["url"]
         elif retData["code"] == 404:
@@ -276,7 +291,7 @@ def GetOtherParam(firstUrl, SecUrl, type, vKey, rule):
     url = ''
     if rule == 1:
         url = "https://chaoren.sc2yun.com/play.php?v=%s&type=%s" % (type, vKey)
-        html = etree.HTML(requests.get(url, headers=heads).text)
+        html = etree.HTML(requests.get(url, headers=headers).text)
         content = html.xpath('//body/script/text()')[0]
         recontent = re.findall("= '(.+?)'", content)
         return recontent[1]
@@ -288,7 +303,7 @@ def GetOtherParam(firstUrl, SecUrl, type, vKey, rule):
                 "Referer": firstUrl + SecUrl
             }
             u = 'https://api.1suplayer.me/player/?userID=&type=%s&vkey=%s' % (type, vKey)
-            res = requests.get(u, headers=head)
+            res = requests.get(u, headers=headers)
             html = etree.HTML(res.content)
             content = html.xpath('/html/body/script/text()')[0]
             recontent = re.findall(" = '(.+?)'", content)
@@ -305,7 +320,7 @@ def GetOtherParam(firstUrl, SecUrl, type, vKey, rule):
         else:
 
             url = 'http://www.dililitv.com/player/api.php'
-            res = requests.post(url, data={'type': type, 'v': vKey}, headers=heads)
+            res = requests.post(url, data={'type': type, 'v': vKey}, headers=headers)
             link = 'http://www.dililitv.com' + json.loads(res.content)['url']
             respon = requests.get(link)
             return respon.text.split('\n')[2]
@@ -345,16 +360,14 @@ def movies():
 @app.route('/voice', methods=['GET'])
 def voice():
     link = 'https://www.yousxs.com/' + request.args.get("url")
-    redis.delete(link)
-    if redis.exists(link):
-        return jsonify(json.loads(redis.get(link)))
+
     session = requests.session()
 
-    req = session.get(link, headers={"User-Agent": random.choice(user_agent_list)})
+    req = session.get(link, headers=headers)
     req.encoding = "utf-8"
     html = etree.HTML(req.text)
     text = session.get('https://www.yousxs.com/js/bootstrap.min.js',
-                       headers={"User-Agent": random.choice(user_agent_list)}).text
+                       headers=headers).text
     split = text.split(";")
     skey = str(split[-2]).split('=')[1][1:-1]
 
@@ -366,7 +379,6 @@ def voice():
     s = {
         "url": mp3link
     }
-    redis.set(link, json.dumps(s, ensure_ascii=False))
 
     return jsonify(s)
 
@@ -481,27 +493,29 @@ def voice_search():
 @app.route('/voice/more', methods=['POST'])
 def voice_more():
     # key = request.args.get("key")
-    data = request.get_data()
 
-    loads = json.loads(data.decode('utf-8'))
-    key = loads.get('key')
+    key = 'https://www.yousxs.com/' + request.form['key']
 
     if redis.exists(key):
         return jsonify(json.loads(redis.get(key)))
     session = requests.session()
 
-    req = session.get('https://www.yousxs.com/' + key,
+    req = session.get(key,
                       headers={"User-Agent": random.choice(user_agent_list)})
     req.encoding = "utf-8"
     html = etree.HTML(req.text)
     _bks = []
-    for li in html.xpath('/html/body/div/div[5]/div/div/div[2]/ul//li'):
-        href = li.xpath('a/@href')[0]
-        title = li.xpath('a/text()')[0]
-        date = li.xpath('span/text()')[0]
-        _bks.append({
-            "href": href, "title": title, "date": date
-        })
+    for li in html.xpath('//li'):
+
+        try:
+            href = li.xpath('a/@href')[0]
+            title = li.xpath('a/text()')[0]
+            date = li.xpath('span/text()')[0]
+            _bks.append({
+                "href": href, "title": title, "date": date
+            })
+        except Exception as e:
+            print(e)
 
     redis.set(key, json.dumps(_bks), ex=60 * 120)
     return jsonify(_bks)
@@ -790,41 +804,23 @@ def get_detail(word):
 
 @app.route('/book/chapter', methods=['GET'])
 def get_chapter():
-    retry_cnt = 3
     content = ""
+    url = request.args.get("url")
+    html = getHTMLUtf8(url)
 
-    while retry_cnt > 0:
-        url = request.args.get("url")
-        html = getHTMLUtf8(url)
-        if url.__contains__("xbiquge"):
-            content = get_c(html)
-        else:
-            while True:
-                content += get_c(html)
-                next_text = html.xpath('//*[@id="container"]/div/div/div[2]/div[3]/a[3]/text()')[0]
-                html = getHTMLUtf8(
-                    "https://www.266ks.com/" + html.xpath('//*[@id="container"]/div/div/div[2]/div[3]/a[3]/@href')[0])
-                if next_text != "下一页":
-                    break
-        if content == "":
-            retry_cnt -= 1
-        else:
-            break
-
+    if url.__contains__("xbiquge"):
+        content = get_c(html)
+    elif url.__contains__("dwxdwx"):
+        content = get_c1(html)
+    else:
+        while True:
+            content += get_c(html)
+            next_text = html.xpath('//*[@id="container"]/div/div/div[2]/div[3]/a[3]/text()')[0]
+            html = getHTMLUtf8(
+                "https://www.266ks.com/" + html.xpath('//*[@id="container"]/div/div/div[2]/div[3]/a[3]/@href')[0])
+            if next_text != "下一页":
+                break
     return content
-
-
-def get_chapter_content():
-    book_ids = []
-    logger.info("开始定时爬取章节数据")
-    for id in bookDB.find({"hot": {"$gt": 1}}, {"_id": 1}):
-        book_ids.append(id['_id'])
-    for book_id in book_ids:
-        for cid in chapterDB.find({"book_id": str(book_id)}, {"_id": 1}):
-            idx = cid["_id"]
-            requests.get("http://localhost:8081/v1/book/chapter/" + str(idx))
-            time.sleep(2)
-    logger.info("定时爬取章节数据完成")
 
 
 def freshIdx():
@@ -922,17 +918,18 @@ def delete_proxy(proxy):
 
 def getHTMLzz(param):
     retry_count = 2
-    proxy = get_proxy().get("proxy")
+    # proxy = get_proxy().get("proxy")
     while retry_count > 0:
         try:
-            get = requests.get(param, proxies={"http": "http://{}".format(proxy)},
+            # get = requests.get(param, proxies={"http": "http://{}".format(proxy)},
+            get = requests.get(param,
                                headers={"User-Agent": random.choice(user_agent_list)}, timeout=20)
-            logger.error("使用代理 http://{}".format(proxy))
+            # logger.error("使用代理 http://{}".format(proxy))
             return get
         except Exception as e:
             retry_count -= 1
     # 删除代理池中代理
-    delete_proxy(proxy)
+    # delete_proxy(proxy)
     logger.error("不可用代理")
     return None
 
@@ -990,4 +987,4 @@ if __name__ == '__main__':
     scheduler.start()
     app.config['JSON_AS_ASCII'] = False
 
-    app.run(port=8012, host='0.0.0.0')
+    app.run(port=8013, host='0.0.0.0')

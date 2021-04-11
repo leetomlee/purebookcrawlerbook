@@ -19,8 +19,8 @@ myclient = pymongo.MongoClient('mongodb://lx:Lx123456@120.27.244.128:27017/')
 mydb = myclient["book"]
 bookDB = mydb["fpzw"]
 chapterDB = mydb["fpzwchapter"]
-
-ids = [f["_id"] for f in bookDB.find({}, {"_id": 1})]
+#
+# ids = [f["_id"] for f in bookDB.find({}, {"_id": 1})]
 
 
 class MeiziSpider(CrawlSpider):

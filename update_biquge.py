@@ -7,14 +7,14 @@ from concurrent.futures.process import ProcessPoolExecutor
 import pymongo
 # client = pymongo.MongoClient(host='192.168.3.9')
 import requests
+from bson import ObjectId
 from lxml import etree
-from redis import StrictRedis
 
 ex = ProcessPoolExecutor()
-redis = StrictRedis(host='120.27.244.128', port=6379, db=0, password='zx222lx')
-myclient = pymongo.MongoClient('mongodb://lx:Lx123456@120.27.244.128:27017/')
+# redis = StrictRedis(host='120.27.244.128', port=6379, db=0, password='zx222lx')
+myclient = pymongo.MongoClient('mongodb://lx:Lx123456@134.175.83.19:27017/')
 mydb = myclient["book"]
-book = mydb["bks"]
+bookDB = mydb["books"]
 accountDB = mydb["account"]
 chapterDB = mydb["chapters"]
 user_agent_list = [
@@ -51,7 +51,7 @@ def getHTML(url):
 
 
 def update_book_state():
-    find = book.find({}, {"_id": 1, "u_time": 1})
+    find = bookDB.find({}, {"_id": 1, "u_time": 1})
     nowTime_str = datetime.datetime.now().strftime('%Y-%m-%d')
     e_time = time.mktime(time.strptime(nowTime_str, "%Y-%m-%d"))
 
@@ -73,7 +73,7 @@ def update_book_state():
                 newvalues = {
                     "$set": {"status": "完结"}}
 
-                book.update_one(myquery, newvalues)
+                bookDB.update_one(myquery, newvalues)
             else:
                 continue
 
@@ -86,7 +86,7 @@ def get_books_from_db():
     # find = book.find({}, {"_id": 1}).sort(sort)
     # find = book.find({"hot": 0}, {"_id": 1, "hot": 1, "link": 1})
     # find = book.find({}, {"_id": 1, "link": 1})
-    find = book.find({"hot": {"$gt": 0}, "status": {"$ne": "完结"}}, {"_id": 1, "link": 1})
+    find = bookDB.find({"hot": {"$gt": 0}, "status": {"$ne": "完结"}}, {"_id": 1, "link": 1})
     # find = book.find({"hot": {"$gt": 0}}, {"_id": 1, "link": 1})
     for f in find:
         #     print(f["status"])
@@ -148,7 +148,7 @@ def updateBook(id, url):
             newvalues = {
                 "$set": {"u_time": update_time, "last_chapter": latest_chapter_name, "status": status}}
 
-            book.update_one(myquery, newvalues)
+            bookDB.update_one(myquery, newvalues)
             logging.info("book info update " + str(id))
     except Exception as e:
         logging.error(e)
@@ -156,14 +156,22 @@ def updateBook(id, url):
 
 if __name__ == '__main__':
     # updateBook("")
-    find = chapterDB.find({}, {"_id": 1})
-    #
-    # for i in find:
-    #     myquery = {"_id": i["_id"]}
-    newvalues = {
-            "$set": {"content": ""}}
-
-    chapterDB.update_many({}, newvalues)
+    find = chapterDB.find({}, {"_id": 1, "link": 1})
+    for f in find:
+        try:
+            link = f['link']
+            if str(link).__contains__("xbiquge"):
+                link = str(link).replace("xbiquge.la", "paoshuzw.com")
+            # cover = f['cover']
+            # if str(cover).__contains__("xbiquge"):
+            #     cover = str(cover).replace("xbiquge.la", "paoshuzw.com")
+            id = f["_id"]
+            newvalues = {
+                "$set": {"link": link}}
+            myquery = {"_id": ObjectId(id)}
+            chapterDB.update_many(myquery, newvalues)
+        except Exception as e:
+            logging.error(e)
 
 # stime = datetime.datetime.now()
 # logging.info("all update  " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))

@@ -28,7 +28,7 @@ def getFileList(dir, Filelist, ext=None):
 
 
 if __name__ == '__main__':
-    org_img_folder = r'C:\Users\77558\Desktop\120_d1d5b411fa37603c4eca6c9249333bbd'
+    org_img_folder = r'C:\Users\lxv1\Desktop\1'
 
 
 # 检索文件

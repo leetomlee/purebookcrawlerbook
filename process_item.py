@@ -1,83 +1,59 @@
-#!/usr/bin/env python
-
 # -*- coding: utf-8 -*-
-"""A script to process items from a redis queue."""
-from __future__ import print_function, unicode_literals
-
-import json
-import logging
-import pprint
-import sys
+import datetime
 import time
+from concurrent.futures.process import ProcessPoolExecutor
 
 import pymongo
-from redis import StrictRedis
+# client = pymongo.MongoClient(host='192.168.3.9')
+import requests
+from requests.adapters import HTTPAdapter
 
-redis = StrictRedis(host='120.27.244.128', port=6379, db=0, password='zx222lx')
-logger = logging.getLogger('process_items')
+myclient = pymongo.MongoClient('mongodb://lx:Lx123456@127.0.0.1:27017/')
+# myclient = pymongo.MongoClient('mongodb://lx:Lx123456@134.175.83.19:27017/')
+mydb = myclient["book"]
+bookDB = mydb["books"]
+chapterDB = mydb["chapters"]
 
-client = pymongo.MongoClient(host='120.27.244.128')
-db = client['book']
-chapterDB = db['chapter']
-bookDB = db['book']
+import logging  # 引入logging模块
+ex = ProcessPoolExecutor(max_workers=10)
+logging.basicConfig(level=logging.INFO)  # 设置日志级别
+
+s = requests.Session()
+s.mount('http://', HTTPAdapter(max_retries=3))
+s.mount('https://', HTTPAdapter(max_retries=3))
 
 
-def process_items(keys, limit=0, log_every=1000, wait=.1):
-    """Process items from a redis queue.
-
-    Parameters
-    ----------
-    r : Redis
-        Redis connection instance.
-    keys : list
-        List of keys to read the items from.
-    timeout: int
-        Read timeout.
-
-    """
-    limit = limit or float('inf')
-    processed = 0
-    while processed < limit:
-        # Change ``blpop`` to ``brpop`` to process as LIFO.
-        ret = redis.blpop(keys)
-        # If data is found before the timeout then we consider we are done.
-        if ret is None:
-            time.sleep(wait)
-            continue
-
-        source, data = ret
+def get_books_from_db():
+    find = bookDB.find({"hot": {"$gt": 0}}, {"_id": 1})
+    for f in find:
         try:
-            item = json.loads(data)
-        except Exception:
-            logger.exception("Failed to load item:\n%r", pprint.pformat(data))
-            continue
-
-        try:
-
-            chapterDB.insert_one(item)
-
-        except KeyError:
-            logger.exception("[%s] Failed to process item:\n%r",
-                             source, pprint.pformat(item))
-            continue
-
-        processed += 1
-        if processed % log_every == 0:
-            logger.info("Processed %s items", processed)
+            for cp in chapterDB.find({"book_id": str(f["_id"])}, {"_id": 1, "content": 1}):
+                try:
+                    c = cp['content']
+                except Exception as e:
+                    try:
+                        # ex.submit(req, cp)
+                        s=req(cp)
+                    except Exception as e:
+                        logging.error(e)
+                    logging.error("load chapter id is:" + str(cp['_id']))
+                    continue
+        except Exception as e:
+            logging.error(e)
+    # ex.shutdown(wait=True)
 
 
-def main():
-    try:
-        process_items(keys='yb:items')
-        retcode = 0  # ok
-    except KeyboardInterrupt:
-        retcode = 0  # ok
-    except Exception:
-        logger.exception("Unhandled exception")
-        retcode = 2
+def req(cp):
+    s.get("http://127.0.0.1:8080/v1/book/chapter/" + str(cp["_id"]) + "/async", timeout=10)
 
-    return retcode
+
+# ex.shutdown(wait=True)
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    stime = datetime.datetime.now()
+    logging.info("all update  " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+    get_books_from_db()
+    logging.info("end update  " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+    etime = datetime.datetime.now()
+    logging.info("used_time  " + str((etime - stime).seconds))
