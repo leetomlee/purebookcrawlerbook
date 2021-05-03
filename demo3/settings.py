@@ -30,9 +30,10 @@ ROBOTSTXT_OBEY = False
 DOWNLOAD_DELAY = 0.5
 COOKIES_ENABLED = False
 
+
 DOWNLOADER_MIDDLEWARES = {
-    # 'scrapy.contrib.downloadermiddleware.useragent.UserAgentMiddleware': None,
-    # 'demo3.middlewares.RotateUserAgentMiddleware': 400,
+    
+    'demo3.middlewares.RotateUserAgentMiddleware': 400,
     # 'demo3.middlewares.ProxyMiddleware': 382,
 
 
