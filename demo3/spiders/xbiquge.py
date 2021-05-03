@@ -19,21 +19,21 @@ s = 0
 #
 # db.authenticate('lx', 'Lx123456')
 #myclient = pymongo.MongoClient('mongodb://lx:Lx123456@localhost:27017/', connect=False)
-myclient = pymongo.MongoClient('mongodb://lx:Lx123456@23.91.100.230:27017/')
+myclient = pymongo.MongoClient('mongodb://lx:Lx123456@134.175.83.19:27017/')
 mydb = myclient["book"]
 bookDB = mydb["books"]
 chapterDB = mydb["chapters"]
 es = Elasticsearch(
-     ['23.91.100.230:8088'],
+     ['134.175.83.19:8088'],
      # 认证信息
-     http_auth=('elastic', 'jXqw0zF3XPOxu8PThv8H')
+     http_auth=('elastic', 'Z2jJ2sZWGPy0bulSf4dZ')
  )
 #es = Elasticsearch(
 #    ['localhost:8088'],
 # 
 #    http_auth=('elastic', 'Z2jJ2sZWGPy0bulSf4dZ')
 #)
-redis = StrictRedis(host='23.91.100.230', port=6379, db=1, password='zx222lx')
+redis = StrictRedis(host='134.175.83.19', port=6379, db=1, password='zx222lx')
 #redis = StrictRedis(host='localhost', port=6379, db=1, password='zx222lx')
 
 
