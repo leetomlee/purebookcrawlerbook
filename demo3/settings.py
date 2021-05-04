@@ -45,7 +45,7 @@ ITEM_PIPELINES = {
     # 'demo3.pipelines.CrawlerScrapyPipeline': 1,
     # 'scrapy_redis.pipelines.RedisPipeline': 300
 }
-LOG_LEVEL = 'DEBUG'
+
 REDIS_HOST = "120.27.244.128"
 REDIS_PORT = "6379"
 REDIS_PARAMS = {
