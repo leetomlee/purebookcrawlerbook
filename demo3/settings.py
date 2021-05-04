@@ -21,7 +21,7 @@ user_agent_list = [
     "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24"
 ]
 BOT_NAME = 'demo3'
-
+LOG_LEVEL = 'INFO'
 SPIDER_MODULES = ['demo3.spiders']
 NEWSPIDER_MODULE = 'demo3.spiders'
 # DEPTH_LIMIT = 5
@@ -30,15 +30,13 @@ ROBOTSTXT_OBEY = False
 DOWNLOAD_DELAY = 0.5
 COOKIES_ENABLED = False
 
-
 DOWNLOADER_MIDDLEWARES = {
-    
+
     'demo3.middlewares.RotateUserAgentMiddleware': 400,
     # 'demo3.middlewares.ProxyMiddleware': 382,
 
-
 }
-#DUPEFILTER_CLASS = 'demo3.middlewares.CustomFilter'
+# DUPEFILTER_CLASS = 'demo3.middlewares.CustomFilter'
 
 
 ITEM_PIPELINES = {
@@ -47,7 +45,7 @@ ITEM_PIPELINES = {
     # 'demo3.pipelines.CrawlerScrapyPipeline': 1,
     # 'scrapy_redis.pipelines.RedisPipeline': 300
 }
-LOG_LEVEL ='DEBUG'
+LOG_LEVEL = 'DEBUG'
 REDIS_HOST = "120.27.244.128"
 REDIS_PORT = "6379"
 REDIS_PARAMS = {
@@ -56,4 +54,3 @@ REDIS_PARAMS = {
 # SCHEDULER = "scrapy_redis.scheduler.Scheduler"
 # DUPEFILTER_CLASS = "scrapy_redis.dupefilter.RFPDupeFilter"
 # SCHEDULER_PERSIST = True
-

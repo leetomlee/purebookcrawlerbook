@@ -70,6 +70,7 @@ class MeiziSpider(CrawlSpider):
         author = selector.xpath("//meta[@property='og:novel:author']/@content").extract_first()
         key1 = book_name + author
         if keys.__contains__(key1):
+            logging.info("库中存在:"+str(book_name))
             return
         keys.append(key1)
         cover = selector.xpath("//meta[@property='og:image']/@content").extract_first()
