@@ -19,14 +19,14 @@ s = 0
 #
 # db.authenticate('lx', 'Lx123456')
 # myclient = pymongo.MongoClient('mongodb://lx:Lx123456@localhost:27017/', connect=False)
-myclient = pymongo.MongoClient('mongodb://lx:Lx123456@134.175.83.19:27017/')
+myclient = pymongo.MongoClient('mongodb://lx:1qa2ws3ed@47.243.83.83:27017/')
 mydb = myclient["book"]
 bookDB = mydb["books"]
 chapterDB = mydb["chapters"]
 es = Elasticsearch(
-    ['134.175.83.19:8088'],
+    ['47.243.83.83:8088'],
     # 认证信息
-    http_auth=('elastic', 'Z2jJ2sZWGPy0bulSf4dZ')
+    http_auth=('elastic', '1qa2ws3ed')
 )
 # es = Elasticsearch(
 #    ['localhost:8088'],
