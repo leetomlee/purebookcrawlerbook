@@ -2,7 +2,9 @@
 import logging
 
 import pymongo
+import requests
 from elasticsearch import Elasticsearch
+from lxml import etree
 from scrapy import Selector
 from scrapy.linkextractors import LinkExtractor
 from scrapy.spiders import CrawlSpider, Rule
@@ -18,22 +20,24 @@ s = 0
 # db = client.admin
 #
 # db.authenticate('lx', 'Lx123456')
-# myclient = pymongo.MongoClient('mongodb://lx:Lx123456@localhost:27017/', connect=False)
-myclient = pymongo.MongoClient('mongodb://lx:1qa2ws3ed@47.243.83.83:27017/')
+myclient = pymongo.MongoClient('mongodb://lx:Lx123456@134.175.83.19:27017/', connect=False)
+# myclient = pymongo.MongoClient('mongodb://lx:Lx123456@23.91.100.230:27017/')
 mydb = myclient["book"]
 bookDB = mydb["books"]
 chapterDB = mydb["chapters"]
-es = Elasticsearch(
-    ['47.243.83.83:8088'],
-    # 认证信息
-    http_auth=('elastic', '1qa2ws3ed')
-)
 # es = Elasticsearch(
-#    ['localhost:8088'],
-# 
-#    http_auth=('elastic', 'Z2jJ2sZWGPy0bulSf4dZ')
+#     ['23.91.100.230:8088'],
+#     # 认证信息
+#     http_auth=('elastic', 'jXqw0zF3XPOxu8PThv8H')
 # )
-# redis = StrictRedis(host='134.175.83.19', port=6379, db=1, password='zx222lx')
+es = Elasticsearch(
+    ['134.175.83.19:8088'],
+
+    http_auth=('elastic', 'Z2jJ2sZWGPy0bulSf4dZ')
+)
+
+
+# redis = StrictRedis(host='23.91.100.230', port=6379, db=0, password='zx222lx')
 # redis = StrictRedis(host='localhost', port=6379, db=1, password='zx222lx')
 keys = []
 for book in bookDB.find({}, {"book_name": 1, "author": 1}):
@@ -45,7 +49,6 @@ for book in bookDB.find({}, {"book_name": 1, "author": 1}):
         logging.error(e)
         continue
 logging.info("去重关键字:"+str(len(keys)))
-
 
 class MeiziSpider(CrawlSpider):
     name = 'xbiquge'
@@ -70,7 +73,7 @@ class MeiziSpider(CrawlSpider):
         author = selector.xpath("//meta[@property='og:novel:author']/@content").extract_first()
         key1 = book_name + author
         if keys.__contains__(key1):
-            logging.info("库中存在:"+str(book_name))
+            logging.info("库中存在:" + str(book_name))
             return
         keys.append(key1)
         cover = selector.xpath("//meta[@property='og:image']/@content").extract_first()
@@ -109,6 +112,3 @@ class MeiziSpider(CrawlSpider):
                 chapters.append(chapter)
         if len(chapters) > 0:
             chapterDB.insert_many(chapters)
-
-
-
