@@ -100,29 +100,21 @@ class NunusfSpider(CrawlSpider):
         item = book.load_item()
         book_id = str(bookDB.insert_one(dict(item)).inserted_id)
         index = es.index(index="book", id=book_id,
-                          body={"book_name": book_name, "book_author": author})
+                         body={"book_name": book_name, "book_author": author})
         chapters = []
         page_nums = selector.xpath('//*[@id="pageNum"]/div/span[2]/text()').extract_first()
-        print(page_nums)
         bookid = selector.xpath('//*[@id="bookDetails"]/@data-bookid').extract_first()
         for page in range(int(page_nums)):
             uks = "https://www.nunusf.com/e/extend/bookpage/pages.php?id=" + bookid + "&pageNum=" + str(
-                        int(page)) + "&dz=asc"
+                int(page)) + "&dz=asc"
 
             json = requests.get(uks).json()
-            for item in json['list']:
-                chapter = {
-                    'book_id': bookid,
-                    'link': item['pic'],
-                    'chapter_name': item['title']}
-                chapters.append(chapter)
-                print(chapter)
+            if 'list' in json:
+                for item in json['list']:
+                    chapter = {
+                        'book_id': "",
+                        'link': item['pic'],
+                        'chapter_name': item['title']}
+                    chapters.append(chapter)
         if len(chapters) > 0:
-             chapterDB.insert_many(chapters)
-        
-
-
-if __name__ == '__main__':
-    str = 12
-    for i in range(str):
-        print(i + 1)
+            chapterDB.insert_many(chapters)
