@@ -106,7 +106,7 @@ class NunusfSpider(CrawlSpider):
         print(page_nums)
         bookid = selector.xpath('//*[@id="bookDetails"]/@data-bookid').extract_first()
         for page in range(int(page_nums)):
-            uks = "https://www.nunusf.com/e/extend/bookpage/pages.php?id=" + bookid + "&pageNum=" + (
+            uks = "https://www.nunusf.com/e/extend/bookpage/pages.php?id=" + bookid + "&pageNum=" + str(
                         int(page) + 1) + "&dz=asc"
 
             json = requests.get(uks).json()
