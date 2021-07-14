@@ -58,7 +58,7 @@ class NunusfSpider(CrawlSpider):
     ]
 
     rules = (
-        Rule(LinkExtractor(allow=r'/.*?/.*?/$', ),
+        Rule(LinkExtractor(allow=r'/\w+/\w+/$', ),
              callback='parse_mm', follow=True, ),
         # Rule(LinkExtractor(allow=r'/.*?/$', ),
         #      follow=True, ),
