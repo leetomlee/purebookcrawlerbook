@@ -105,7 +105,7 @@ class NunusfSpider(CrawlSpider):
         page_nums = selector.xpath('//*[@id="pageNum"]/div/span[2]/text()').extract_first()
         print(page_nums)
         bookid = selector.xpath('//*[@id="bookDetails"]/@data-bookid').extract_first()
-        for page in range(page_nums):
+        for page in range(int(page_nums)):
             uks = "https://www.nunusf.com/e/extend/bookpage/pages.php?id=" + bookid + "&pageNum=" + (
                         page + 1) + "&dz=asc"
 
