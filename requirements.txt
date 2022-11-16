@@ -8,3 +8,4 @@ scrapy
 elasticsearch
 gunicorn
 loguru
+telethon
