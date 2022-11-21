@@ -33,25 +33,7 @@ from redis import StrictRedis
 #     use_unicode=False,
 # )
 
-uri = 'mongodb://admin:lx123456zx@120.27.244.128:27017/admin'
 
-# client = pymongo.MongoClient(host='192.168.3.9')
-client = pymongo.MongoClient(host='120.27.244.128')
-db = client['book']
-book = db['xbiquge']
-chapter = db['chapter']
-
-redis = StrictRedis(host='120.27.244.128', port=6379, db=0, password='zx222lx')
-
-
-class CrawlerScrapyPipeline(object):
-    def process_item(self, item, spider):
-        try:
-            book.insert_one(dict(item))
-            # redis.append(item['book_name']+item["author"],1)
-        except Exception as e:
-            logging.error(e)
-        return item
         # try:
         #     if isinstance(item, Book):
         #         book.update_one({"_id": item["_id"]}, {"$set": dict(item)}, upsert=True)

@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 import requests
 from telethon.tl.types import InputMessagesFilterPhotos
 from telethon.tl.types import InputMessagesFilterVideo
+from telethon.tl.types import InputMessagesFilterDocument
 
 pool = ThreadPoolExecutor(max_workers=2)
 # from minio import Minio
@@ -34,7 +35,7 @@ client = TelegramClient('123', api_id, api_hash)
 # client = TelegramClient('session_name', api_id, api_hash, proxy=(python_socks.ProxyType.SOCKS5, '127.0.0.1', 1080))
 # client.start()
 # 频道名称
-keys = ["dongmam"]
+keys = ["tg_1314"]
 
 # keys = ["sourcefornew"]
 message_list = []
@@ -49,13 +50,12 @@ from concurrent.futures import ThreadPoolExecutor
 theard_pool = ThreadPoolExecutor(max_workers=2)
 ffs = []
 
-
 async def main(key):
     i = 0
 
-    async for message in client.iter_messages(key, filter=InputMessagesFilterPhotos):
+    async for message in client.iter_messages(key, filter=InputMessagesFilterDocument):
         i = i + 1
-        await client.download_media(message, local_filepath_photo)
+        await client.download_media(message, local_filepath_txt)
         print(i)
         # await client.download_media(message, local_filepath_photo)
 

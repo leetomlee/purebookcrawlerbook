@@ -9,3 +9,4 @@ elasticsearch
 gunicorn
 loguru
 telethon
+fake_useragent

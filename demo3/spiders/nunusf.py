@@ -3,7 +3,6 @@ import logging
 
 import pymongo
 import requests
-from elasticsearch import Elasticsearch
 from scrapy import Selector
 from scrapy.linkextractors import LinkExtractor
 from scrapy.spiders import CrawlSpider, Rule
@@ -20,7 +19,7 @@ s = 0
 # db = client.admin
 #
 # db.authenticate('lx', 'Lx123456')
-myclient = pymongo.MongoClient('mongodb://lx:Lx123456@134.175.83.19:27017/', connect=False)
+myclient = pymongo.MongoClient('mongodb://lx:Lx123456@121.37.139.13:27017/', connect=False)
 # myclient = pymongo.MongoClient('mongodb://lx:Lx123456@23.91.100.230:27017/')
 mydb = myclient["book"]
 bookDB = mydb["books"]
@@ -30,25 +29,12 @@ chapterDB = mydb["chapters"]
 #     # 认证信息
 #     http_auth=('elastic', 'jXqw0zF3XPOxu8PThv8H')
 # )
-es = Elasticsearch(
-    ['134.175.83.19:8088'],
 
-    http_auth=('elastic', 'Z2jJ2sZWGPy0bulSf4dZ')
-)
 
 # redis = StrictRedis(host='23.91.100.230', port=6379, db=0, password='zx222lx')
 # redis = StrictRedis(host='localhost', port=6379, db=1, password='zx222lx')
-keys = []
-for book in bookDB.find({"type": type}, {"book_name": 1, "author": 1}):
-    try:
 
-        key = book['book_name'] + book['author']
-        keys.append(key)
-    except Exception as e:
-        logging.error(e)
-        continue
-logging.info("去重关键字:" + str(len(keys)))
-
+# https://www.biquge.co/0_410/
 
 class NunusfSpider(CrawlSpider):
     name = type
@@ -71,11 +57,7 @@ class NunusfSpider(CrawlSpider):
         selector = Selector(response=response)
         book_name = selector.xpath("//meta[@property='og:novel:book_name']/@content").extract_first()
         author = selector.xpath("//meta[@property='og:novel:author']/@content").extract_first()
-        key1 = book_name + author
-        if keys.__contains__(key1):
-            logging.info("库中存在:" + str(book_name))
-            return
-        keys.append(key1)
+
         cover = selector.xpath("//meta[@property='og:image']/@content").extract_first()
         category = selector.xpath("//meta[@property='og:novel:category']/@content").extract_first()
         status = selector.xpath("//meta[@property='og:novel:status']/@content").extract_first()
@@ -99,8 +81,7 @@ class NunusfSpider(CrawlSpider):
         book.add_value('last_chapter', latest_chapter_name)
         item = book.load_item()
         book_id = str(bookDB.insert_one(dict(item)).inserted_id)
-        index = es.index(index="book", id=book_id,
-                         body={"book_name": book_name, "book_author": author})
+
         chapters = []
         page_nums = selector.xpath('//*[@id="pageNum"]/div/span[2]/text()').extract_first()
         bookid = selector.xpath('//*[@id="bookDetails"]/@data-bookid').extract_first()

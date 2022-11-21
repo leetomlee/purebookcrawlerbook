@@ -89,17 +89,10 @@ class ProxyMiddleware(object):
     def __init__(self, ip):
         self.ip = ip
 
-    @classmethod
-    def from_crawler(cls, crawler):
-        proxy_ = get_proxy()['proxy']
-        return cls(ip=proxy_)
-
-    def process_request(self, request, spider):
-        request.meta['proxy'] = self.ip
 
 
-def get_proxy():
-    return requests.get("http://120.27.244.128:5010/get/").json()
+
+
 
 
 class RotateUserAgentMiddleware(UserAgentMiddleware):
